@@ -1,0 +1,95 @@
+# =====================================================================
+# FastTrack - local development stack.
+#
+#   cp .env.example .env    # then: docker compose up --build
+#
+# Everything here is free and open source. No cloud services are required
+# to run the application end to end (Gmail and the LLM are optional).
+# =====================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fasttrack-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fasttrack}
+      POSTGRES_USER: ${POSTGRES_USER:-fasttrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fasttrack_local_dev_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fasttrack} -d ${POSTGRES_DB:-fasttrack}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: fasttrack-redis
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fasttrack-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fasttrack}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-fasttrack}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fasttrack_local_dev_only}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # Optional integrations - blank is fine, the app degrades gracefully.
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.groq.com/openai/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.3-70b-versatile}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:3000}
+      APP_BACKEND_URL: ${APP_BACKEND_URL:-http://localhost:8080}
+      APP_SECURE_COOKIES: ${APP_SECURE_COOKIES:-false}
+      APP_DEMO_ENABLED: ${APP_DEMO_ENABLED:-true}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    container_name: fasttrack-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  redisdata:

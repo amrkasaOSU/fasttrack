@@ -1,0 +1,42 @@
+# ---- secrets ----
+.env
+.env.local
+*.pem
+*.p12
+credentials.json
+client_secret*.json
+tokens/
+
+# ---- java / maven ----
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# ---- node / next ----
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+
+# ---- test / tooling output ----
+playwright-report/
+test-results/
+blob-report/
+coverage/
+jacoco.exec
+lighthouse/*.json
+lighthouse/*.html
+k6/out/
+
+# ---- local data ----
+pgdata/
+uploads/
+*.local
+
+# ---- os / editors ----
+.DS_Store
+.idea/
+.vscode/
+*.iml

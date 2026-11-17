@@ -1,0 +1,22 @@
+# Test profile. Datasource and Redis are injected by Testcontainers
+# (see AbstractIntegrationTest). Optional integrations stay unconfigured so
+# the suite proves the app runs without Gmail or an LLM key.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+app:
+  demo-enabled: true
+  google:
+    client-id: ""
+    client-secret: ""
+  llm:
+    api-key: ""
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN
