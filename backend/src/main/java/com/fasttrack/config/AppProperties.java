@@ -17,6 +17,8 @@ public class AppProperties {
     private String backendUrl = "http://localhost:8080";
     private boolean secureCookies = false;
     private boolean demoEnabled = true;
+    /** Seed the demo account's data at start-up when it is empty. */
+    private boolean demoSeedOnStartup = true;
     /** Base64-encoded 32-byte key for AES-256-GCM encryption of refresh tokens. */
     private String tokenEncryptionKey = "";
 
@@ -110,6 +112,8 @@ public class AppProperties {
     public void setSecureCookies(boolean secureCookies) { this.secureCookies = secureCookies; }
     public boolean isDemoEnabled() { return demoEnabled; }
     public void setDemoEnabled(boolean demoEnabled) { this.demoEnabled = demoEnabled; }
+    public boolean isDemoSeedOnStartup() { return demoSeedOnStartup; }
+    public void setDemoSeedOnStartup(boolean demoSeedOnStartup) { this.demoSeedOnStartup = demoSeedOnStartup; }
     public String getTokenEncryptionKey() { return tokenEncryptionKey; }
     public void setTokenEncryptionKey(String tokenEncryptionKey) { this.tokenEncryptionKey = tokenEncryptionKey; }
     public Google getGoogle() { return google; }

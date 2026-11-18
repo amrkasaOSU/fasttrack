@@ -10,6 +10,8 @@ spring:
 
 app:
   demo-enabled: true
+  # Tests seed explicitly so counts stay deterministic and start-up stays fast.
+  demo-seed-on-startup: false
   google:
     client-id: ""
     client-secret: ""

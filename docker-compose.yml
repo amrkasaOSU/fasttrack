@@ -1,6 +1,10 @@
 # =====================================================================
 # FastTrack - local development stack.
 #
+# Host ports are overridable: if something already uses 3000/8080 on your
+# machine, set FRONTEND_PORT / BACKEND_PORT in .env (and point
+# APP_FRONTEND_URL / NEXT_PUBLIC_API_BASE_URL at the same ports).
+#
 #   cp .env.example .env    # then: docker compose up --build
 #
 # Everything here is free and open source. No cloud services are required
@@ -16,7 +20,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-fasttrack}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fasttrack_local_dev_only}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +34,7 @@ services:
     container_name: fasttrack-redis
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -67,7 +71,7 @@ services:
       APP_SECURE_COOKIES: ${APP_SECURE_COOKIES:-false}
       APP_DEMO_ENABLED: ${APP_DEMO_ENABLED:-true}
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 10s
@@ -88,7 +92,7 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   pgdata:

@@ -20,24 +20,25 @@ Hardware for all local measurements unless stated otherwise:
 _No measurements recorded yet. Milestones 3, 5, 6, 8 and 9 populate this file:
 classifier accuracy, matcher precision/recall, fit-band agreement, test
 coverage, k6 load results and Lighthouse scores._
-## Milestone 1 - test suite and coverage
+## Test suite and coverage (re-measured each milestone)
 
 **What:** backend unit + integration tests, and line coverage enforced by the
 build.
 **Tool:** JUnit 5 + Spring Boot Test + Testcontainers (PostgreSQL 16, Redis 7),
 JaCoCo 0.8.16.
-**Setup:** `mvn verify` on the machine described above; containers started by
-Testcontainers, no stubs for the database or the cache.
+**Setup:** `mvn verify` on the machine described above. The integration tests
+run against real containers - no in-memory database, no stubbed cache.
 
-| Metric | Value |
-|---|---|
-| Tests | 52 passing, 0 failing, 0 skipped |
-| Line coverage | 92.0 % (391 / 425) |
-| Branch coverage | 81.4 % (57 / 70) |
-| Instruction coverage | 92.1 % (1641 / 1782) |
-| Method coverage | 87.2 % (164 / 188) |
-| Class coverage | 100 % (33 / 33) |
-| Coverage gate | 80 % lines, enforced in `mvn verify` (passes) |
+| Metric | Milestone 1 | Milestone 2 |
+|---|---|---|
+| Tests passing | 52 | 190 |
+| Test classes | 6 | 16 |
+| Line coverage | 92.0 % (391/425) | 92.3 % (1158/1254) |
+| Branch coverage | 81.4 % (57/70) | 76.7 % (355/463) |
+| Instruction coverage | 92.1 % | 92.9 % (6129/6597) |
+| Method coverage | 87.2 % | 89.7 % (315/351) |
+| Class coverage | 100 % | 100 % (59/59) |
+| Coverage gate | 80 % lines - passes | 80 % lines - passes |
 
 Reproduce:
 
@@ -48,5 +49,26 @@ make verify && python3 scripts/coverage_summary.py
 (`make` sets `DOCKER_HOST` for Colima automatically; on Docker Desktop or
 Linux, `cd backend && mvn verify` is equivalent.)
 
-_Coverage is re-measured at every milestone; this row will move as the
-codebase grows._
+## Demo data set (milestone 2)
+
+**What:** the data a visitor sees when they press "Try the demo".
+**Tool:** `DemoDataSeeder`, fixed random seed `20260216`, asserted by
+`DemoDataSeederIntegrationTest`.
+
+| Measure | Value |
+|---|---|
+| Applications seeded | 60 |
+| Distinct employers | 45 |
+| Timeline events written | one per status change, every application has at least `CREATED` |
+| Outcome mix | asserted: most applications unanswered, rejections outnumber interviews, at most 3 offers |
+| Determinism | same seed produces the same data on every machine (asserted by idempotency test) |
+
+Reproduce:
+
+```bash
+cd backend && mvn -B test -Dtest=DemoDataSeederIntegrationTest
+```
+
+_Still to be measured in later milestones: classifier accuracy and per-category
+F1 (M3), matcher precision/recall (M5), fit-band agreement (M6), k6 load
+results and Lighthouse scores (M9)._
