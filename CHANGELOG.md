@@ -36,3 +36,24 @@ All notable changes to FastTrack. Format loosely follows
   filterable, paginated, responsive), application detail with timeline and
   status editing, add/edit form (React Hook Form + Zod), CSV tools, settings.
 - Docs: architecture.md, database.md. Compose host ports are now overridable.
+
+### Milestone 3 - prefilter, LLM abstraction, classifier, caching, evaluation
+- Rule-based prefilter that drops job alerts, newsletters, networking
+  notifications and account plumbing before any model call, while keeping ATS
+  mail and anything carrying a decisive application phrase.
+- `LlmProvider` abstraction with one OpenAI-compatible HTTP implementation
+  (Groq, Ollama, OpenRouter, vLLM - no vendor SDK), with selective retries,
+  backoff and client-side latency measurement.
+- Versioned prompt file `prompts/classify_v1.txt`, loaded from the classpath;
+  the version is stored on every classification and is part of the cache key.
+- Strict schema validation of model output: unknown category or out-of-range
+  confidence is refused, one retry is attempted, then the rule-based
+  classifier takes over. A classification always comes back.
+- Redis classification cache keyed by content hash + prompt version + model,
+  with graceful degradation when Redis is unavailable.
+- `llm_invocations` metrics for every call that leaves the process.
+- Evaluation harness: 200 labeled synthetic emails (`eval/emails.jsonl`,
+  generated with a fixed seed), a `-Peval` runner reporting accuracy,
+  per-category precision/recall/F1, a confusion matrix, latency percentiles,
+  prefilter drop rate and review-queue effectiveness.
+- Docs: ai.md (prompts, schema, fallbacks, caching, evaluation caveats).

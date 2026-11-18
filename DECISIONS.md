@@ -77,3 +77,43 @@ space, as created). Scripts quote all paths; nothing in the repo depends on
 the folder name.
 **Why:** Renaming the directory would break the running session's working
 directory. The git repository root is portable regardless of folder name.
+
+## D-009 - 0.7 confidence threshold for the review queue
+**Decision:** a classification below 0.7 confidence does not change an
+application's status on its own; it goes to the Needs review queue.
+**Why:** measured. On the 200-email evaluation set every one of the classifier's
+seven mistakes carried confidence below the threshold, and only one correct
+result was flagged unnecessarily - 4% of the set routed for review caught 100%
+of the errors (RESULTS.md). A higher bar would add review work for no gain; a
+lower one would let the known failure shapes through silently.
+
+## D-010 - The rule-based classifier is maintained, not vestigial
+**Decision:** the deterministic classifier is a first-class component: it is
+the fallback whenever the model is absent, unreachable or invalid, and it is
+the published baseline the LLM is measured against.
+**Why:** the product must work with no API key at all, and "the LLM is better"
+is only a claim if there is something to compare it with. Keeping the baseline
+honest also makes the LLM's contribution measurable rather than assumed.
+**Cost:** phrase lists need occasional maintenance. That is accepted.
+
+## D-011 - Prompt files, not string literals **
+**Decision:** prompts live in `prompts/<name>_v<N>.txt` at the repository
+root, copied onto the classpath by Maven. The version string is stored on every
+classification and forms part of the cache key.
+**Why:** a prompt change is a behaviour change, so it should appear in a diff
+and in review. Including the version in the cache key stops results produced by
+two different prompts from being mixed, which would quietly corrupt any
+evaluation run after a prompt edit.
+
+## D-012 - Evaluation set is synthetic and generated, not collected
+**Decision:** the 200-email evaluation set is generated from templates by
+`scripts/generate_eval_set.py` with a fixed seed.
+**Why:** real application email cannot be committed - it contains personal data
+belonging to other people as well as to me (docs/privacy.md). A seeded
+generator gives a set that is reproducible on any machine, reviewable in a
+diff, and safe to publish.
+**Known weakness, stated plainly:** templated text flatters a phrase-matching
+classifier, and the phrase lists were iterated against this set, so the
+rule-based numbers are in-sample and are an upper bound. The live-accuracy
+metric computed from real user corrections is the honest counterpart, and the
+LLM path is measured on the same set without tuning.

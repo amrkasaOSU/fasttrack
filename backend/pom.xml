@@ -153,6 +153,21 @@
 
   <build>
     <finalName>fasttrack-backend</finalName>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- The prompt templates live at the repository root so they are easy to
+           review and version alongside the evaluation set; the build copies
+           them onto the classpath rather than keeping a second copy. -->
+      <resource>
+        <directory>${project.basedir}/../prompts</directory>
+        <targetPath>prompts</targetPath>
+        <includes>
+          <include>*.txt</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
@@ -224,7 +239,11 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>eval</groups>
-              <excludedGroups/>
+              <!-- "none" is a tag no test carries; it clears the default
+                   exclusion without leaving the element empty, which Maven
+                   would merge with the parent value instead of overriding. -->
+              <excludedGroups>none</excludedGroups>
+              <skipTests>false</skipTests>
             </configuration>
           </plugin>
         </plugins>
