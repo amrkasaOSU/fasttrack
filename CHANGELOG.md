@@ -164,3 +164,16 @@ All notable changes to FastTrack. Format loosely follows
 - Fixed: a privacy test asserted over every user's emails rather than the one
   under test, so it started failing for the right reason once the demo
   mailbox existed.
+
+### Milestone 9 - performance measurement
+- k6 load test driving the real sign-in handshake, run at 50, 100 and 250
+  concurrent users after a discarded warm-up pass: 352.9 / 707.9 / 897.6
+  requests per second with zero failures across 60,143 requests.
+- Sync throughput measured against a WireMock Gmail: 3,888 emails per minute
+  (15.4 ms per message) end to end through prefilter, classifier, matcher and
+  database.
+- Lighthouse run against the real signed-in pages by driving Chromium with
+  Playwright and attaching Lighthouse over the DevTools protocol: 100
+  performance and 100 accessibility on all four main pages.
+- The demo account now has a resume, so the Fit Checker demonstrates a real
+  score instead of asking a visitor to upload one.

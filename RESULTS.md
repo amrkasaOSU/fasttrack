@@ -335,6 +335,102 @@ python3 scripts/generate_fit_pairs.py
 cd backend && mvn -B -Peval test     # writes eval/results/fit-scorer.md
 ```
 
-_Still to be measured: LLM classifier accuracy and LLM fit scoring (both need
-an API key), sync throughput in emails/minute at scale, k6 load results and
-Lighthouse scores (M9)._
+## Load testing (milestone 9)
+
+**What:** latency and throughput on the three endpoints a signed-in user hits
+constantly - the dashboard aggregation, the applications table, and a
+repeated fit check that should hit the posting cache.
+**Tool:** k6 v2.4.0, `k6/load-test.js`. Each virtual user performs the real
+browser handshake (CSRF cookie, then demo sign-in) and keeps its own cookie
+jar.
+**Setup:** full Docker Compose stack (PostgreSQL 16, Redis 7, Spring Boot,
+Next.js) on the Apple Silicon machine described at the top, with the load
+generator on the same machine. 30 seconds per level, after a 15-second
+warm-up run that is discarded - without it the first measured level carried
+JIT compilation and connection-pool fill and looked *worse* than the next one
+up.
+
+| Concurrent users | Requests/sec | Errors | Dashboard p50 / p95 / p99 | Applications p50 / p95 / p99 | Fit check p50 / p95 / p99 |
+|---:|---:|---:|---|---|---|
+| 50 | **352.9** | **0.00 %** | 104 / 182 / 237 ms | 52 / 114 / 134 ms | 9 / 27 / 68 ms |
+| 100 | **707.9** | **0.00 %** | 53 / 327 / 522 ms | 16 / 251 / 449 ms | 9 / 90 / 166 ms |
+| 250 | **897.6** | **0.00 %** | 246 / 615 / 765 ms | 198 / 555 / 696 ms | 152 / 491 / 636 ms |
+
+Totals across the three levels: 60,143 HTTP requests, **zero failed**, zero
+business errors (a response that was not what the endpoint should return).
+
+Notes on reading this honestly:
+
+- **The load generator shares the machine with the stack.** These numbers
+  describe the application's behaviour under concurrency, not what a
+  dedicated server would do.
+- **Every virtual user signs in as the same demo account**, so this is also a
+  test of per-user rate limiting and cache sharing - a harsher case than real
+  traffic, where load is spread over distinct users.
+- The fit check reuses one posting, so it measures the cached path
+  deliberately: parsing a fresh posting involves a model call, which is not a
+  latency this application controls.
+
+Reproduce:
+
+```bash
+docker compose up -d --build
+BASE_URL=http://localhost:8080 ./scripts/run-load-tests.sh
+```
+
+## Sync throughput (milestone 9)
+
+**What:** how fast the sync pipeline ingests mail - fetch, prefilter,
+classify, match, write.
+**Tool:** `SyncThroughputTest` (`-Peval`), 300 messages from a WireMock Gmail
+over a real PostgreSQL.
+**Setup:** no API key, so the deterministic classifier runs; Gmail is local,
+so no network latency is included. Both facts are deliberate: the point is to
+measure the work this application does, which is the part its design
+controls.
+
+| Measure | Value |
+|---|---:|
+| Messages processed | 300 |
+| Wall-clock time | 4.63 s |
+| Throughput | **3,888 emails/minute** |
+| Per message | 15.4 ms |
+| Dropped by the prefilter | 25 % of the set (by construction) |
+
+Reproduce:
+
+```bash
+cd backend && mvn -B -Peval test -Dtest=SyncThroughputTest
+```
+
+## Lighthouse (milestone 9)
+
+**What:** performance and accessibility of every main page, including the
+ones behind a session.
+**Tool:** Lighthouse 12 driving a real Chromium, desktop preset.
+**Setup:** `frontend/scripts/run-lighthouse.mjs` signs in to the demo with
+Playwright and then points Lighthouse at that same browser over the DevTools
+protocol, so the audited pages are the real signed-in pages rather than a
+redirect to the landing screen.
+
+| Page | Performance | Accessibility | Best practices | SEO | FCP | LCP |
+|---|---:|---:|---:|---:|---:|---:|
+| Landing | **100** | **100** | **100** | 100 | 0.2 s | 0.2 s |
+| Dashboard | **100** | **100** | **100** | 100 | 0.2 s | 0.2 s |
+| Applications | **100** | **100** | 96 | 100 | 0.2 s | 0.2 s |
+| Fit checker | **100** | **100** | **100** | 100 | 0.2 s | 0.2 s |
+
+The single deduction is a Chrome DevTools "Content Security Policy" inspector
+issue on the applications page: the frontend CSP allows `'unsafe-inline'` for
+scripts, which Next.js needs unless every response carries a per-request
+nonce. It is listed under Known limitations rather than papered over.
+
+Reproduce:
+
+```bash
+cd frontend && BASE_URL=http://localhost:3000 npm run lighthouse
+```
+
+_Still to be measured: LLM classifier accuracy and LLM-assisted fit scoring.
+Both need an API key - see docs/llm-setup.md. The deterministic paths they
+fall back to are measured above._

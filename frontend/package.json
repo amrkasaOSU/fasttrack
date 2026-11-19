@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lighthouse": "node scripts/run-lighthouse.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.6",
@@ -41,6 +42,7 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^9.21.0",
     "eslint-config-next": "^16.4.6",
+    "lighthouse": "^13.6.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^5.9.3"
   },
