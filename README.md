@@ -2,7 +2,7 @@
 
 **An internship application tracker that reads your email so you don't have to.**
 
-[![CI](https://github.com/OWNER/fasttrack/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/fasttrack/actions/workflows/ci.yml)
+[![CI](https://github.com/amrkasaOSU/fasttrack/actions/workflows/ci.yml/badge.svg)](https://github.com/amrkasaOSU/fasttrack/actions/workflows/ci.yml)
 
 Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Next.js 16 · TypeScript · Docker
 

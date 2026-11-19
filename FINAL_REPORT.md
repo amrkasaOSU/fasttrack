@@ -121,8 +121,8 @@ Worth stating, because it is the argument for having built them:
    configure and deploy it.
 4. **Your real resume**, if you want the Fit Checker using it rather than the
    demo one.
-5. **Repository URL** - the CI badge in the README points at
-   `OWNER/fasttrack` and needs your actual path.
+5. ~~Repository URL~~ - done: <https://github.com/amrkasaOSU/fasttrack>, and
+   the CI badge points at it.
 
 ## Incomplete or deliberately deferred
 
