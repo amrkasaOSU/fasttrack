@@ -13,6 +13,7 @@ import com.fasttrack.support.AbstractIntegrationTest;
 import com.fasttrack.support.UserFixtures;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,7 +181,13 @@ class ApplicationServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(merged.status()).isEqualTo(ApplicationStatus.INTERVIEW_SCHEDULED);
         assertThat(merged.requisitionId()).isEqualTo("JR999");
         assertThat(merged.location()).isEqualTo("Seattle, WA");
-        assertThat(merged.appliedAt()).isEqualTo(source.appliedAt());
+        // Compared at microsecond precision, which is what PostgreSQL's
+        // timestamptz stores. On Linux, Instant.now() has nanosecond
+        // resolution, so the in-memory value and the round-tripped one differ
+        // in their last digits - a test that asserted exact equality passed on
+        // macOS and failed on the CI runner.
+        assertThat(merged.appliedAt().truncatedTo(ChronoUnit.MICROS))
+                .isEqualTo(source.appliedAt().truncatedTo(ChronoUnit.MICROS));
         assertThat(applications.findById(source.id())).isEmpty();
         assertThat(applications.findById(target.id()).orElseThrow().getNotes())
                 .isEqualTo("target note\nsource note");

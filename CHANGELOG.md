@@ -188,3 +188,11 @@ All notable changes to FastTrack. Format loosely follows
 - docs/api.md (every endpoint, the auth handshake, the error contract) and
   docs/deployment.md (two $0 paths, with the cross-origin cookie trap in
   option B called out).
+
+### Published
+- Repository published at https://github.com/amrkasaOSU/fasttrack and the CI
+  badge pointed at it.
+- Fixed a test that compared a database round-trip against an in-memory
+  `Instant.now()`: PostgreSQL stores microseconds while Linux gives
+  nanoseconds, so it passed on macOS and failed on the CI runner. Found by
+  the first CI run, which is what CI is for.
