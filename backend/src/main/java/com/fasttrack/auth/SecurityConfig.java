@@ -95,12 +95,32 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                     .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                     .sessionFixation(sf -> sf.changeSessionId()))
-            .headers(headers -> headers
-                    .frameOptions(frame -> frame.deny())
-                    .contentTypeOptions(Customizer.withDefaults())
-                    .referrerPolicy(r -> r.policy(
-                            org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
-                                    .ReferrerPolicy.SAME_ORIGIN)))
+            .headers(headers -> {
+                headers.frameOptions(frame -> frame.deny());
+                headers.contentTypeOptions(Customizer.withDefaults());
+                headers.referrerPolicy(r -> r.policy(
+                        org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
+                                .ReferrerPolicy.SAME_ORIGIN));
+                // This service returns JSON and nothing else: no scripts, no
+                // styles, no frames, no images. Saying so costs nothing and
+                // turns any future HTML-injection bug into a non-event.
+                headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+                        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"));
+                headers.permissionsPolicyHeader(permissions -> permissions.policy(
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"));
+                headers.crossOriginOpenerPolicy(coop -> coop.policy(
+                        org.springframework.security.web.header.writers
+                                .CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN));
+                if (props.isSecureCookies()) {
+                    // Only meaningful over HTTPS, and harmful on a plain-HTTP
+                    // development machine, so it is tied to the same flag.
+                    headers.httpStrictTransportSecurity(hsts -> hsts
+                            .includeSubDomains(true)
+                            .maxAgeInSeconds(31_536_000));
+                } else {
+                    headers.httpStrictTransportSecurity(hsts -> hsts.disable());
+                }
+            })
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(PUBLIC_PATHS).permitAll()
                     .anyRequest().authenticated())

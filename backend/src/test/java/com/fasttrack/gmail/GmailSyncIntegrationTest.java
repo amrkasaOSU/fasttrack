@@ -152,20 +152,30 @@ class GmailSyncIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("message bodies are never stored - only metadata and the extracted fields")
+    @DisplayName("message bodies are never stored - only metadata and a short snippet")
     void bodiesAreNotStored() {
         stubThreeMessages();
 
         syncService.sync(userId, SyncTrigger.INITIAL);
 
-        emails.findAll().forEach(email -> {
-            assertThat(email.getSnippet()).doesNotContain("After careful review");
+        var stored = emails.findAllByUserIdOrderByReceivedAtDesc(userId,
+                org.springframework.data.domain.PageRequest.of(0, 100)).getContent();
+        assertThat(stored).isNotEmpty();
+
+        for (var email : stored) {
+            // Gmail's own snippet is kept, capped; the body is not.
             assertThat(email.getSnippet().length()).isLessThanOrEqualTo(200);
-        });
-        // The classification keeps the extracted fields, not the prose.
-        classifications.findAll().forEach(classification ->
-                assertThat(classification.getReason() == null ? "" : classification.getReason())
-                        .doesNotContain("Best wishes"));
+            assertThat(email.getSnippet())
+                    .as("the tail of the body must never be stored")
+                    .doesNotContain("Stripe Talent Team")
+                    .doesNotContain("requisition JR884412");
+        }
+
+        // The classification keeps extracted fields, not the prose.
+        var rejection = emails.findByUserIdAndGmailMessageId(userId, "m1").orElseThrow();
+        var classification = classifications.findByEmailId(rejection.getId()).orElseThrow();
+        assertThat(classification.getReason() == null ? "" : classification.getReason())
+                .doesNotContain("Best wishes");
     }
 
     @Test

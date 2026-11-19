@@ -139,3 +139,28 @@ All notable changes to FastTrack. Format loosely follows
 - Dashboard page: stat tiles, action items with countdowns, Recharts weekly
   volume, funnel, and two response-rate charts, each with a text equivalent
   next to it.
+
+### Milestone 8 - security hardening, isolation tests, end-to-end suite
+- Security headers on every API response (CSP, Permissions-Policy, COOP,
+  frame options, referrer policy) and on every frontend page; HSTS only when
+  running behind TLS.
+- 23 security tests: public versus protected endpoints, CSRF on every
+  mutating verb, CORS restriction, actuator exposure, error-message leakage,
+  cookie flags, upload validation, input bounds.
+- 8 cross-user isolation tests: a second account tries every read and every
+  write against another user's application, resume, fit check and email, and
+  the responses are also scanned for leaked content.
+- Demo mailbox: ~136 synthetic emails tied to the demo applications' own
+  histories, including noise the prefilter drops, and a few deliberately
+  low-confidence classifications so the review queue demonstrates something.
+- Playwright end-to-end suite covering demo login, dashboard, adding an
+  application, correcting a classification, the fit checker, settings and
+  sign-out. 7 tests, 3.9 s.
+- CI now has four jobs: backend verify with the coverage gate, the evaluation
+  harnesses (which also check the committed eval sets still match their
+  generators), frontend typecheck/lint/build, and end-to-end against a real
+  Compose stack.
+- Docs: security.md.
+- Fixed: a privacy test asserted over every user's emails rather than the one
+  under test, so it started failing for the right reason once the demo
+  mailbox existed.

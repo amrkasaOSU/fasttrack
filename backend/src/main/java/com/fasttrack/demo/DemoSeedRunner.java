@@ -21,11 +21,16 @@ public class DemoSeedRunner implements ApplicationRunner {
     private final AppProperties props;
     private final DemoAccountService demoAccounts;
     private final DemoDataSeeder seeder;
+    private final DemoEmailSeeder emailSeeder;
 
-    public DemoSeedRunner(AppProperties props, DemoAccountService demoAccounts, DemoDataSeeder seeder) {
+    public DemoSeedRunner(AppProperties props,
+                          DemoAccountService demoAccounts,
+                          DemoDataSeeder seeder,
+                          DemoEmailSeeder emailSeeder) {
         this.props = props;
         this.demoAccounts = demoAccounts;
         this.seeder = seeder;
+        this.emailSeeder = emailSeeder;
     }
 
     @Override
@@ -35,9 +40,11 @@ public class DemoSeedRunner implements ApplicationRunner {
         }
         try {
             User demo = demoAccounts.ensureDemoUser();
-            int created = seeder.seedApplications(demo);
-            if (created > 0) {
-                log.info("Demo account ready: {} applications seeded", created);
+            int applications = seeder.seedApplications(demo);
+            int emails = emailSeeder.seedEmails(demo.getId());
+            if (applications > 0 || emails > 0) {
+                log.info("Demo account ready: {} applications and {} emails seeded",
+                        applications, emails);
             }
         } catch (RuntimeException ex) {
             // Seeding must never stop the application from starting.

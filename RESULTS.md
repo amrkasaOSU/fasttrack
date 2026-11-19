@@ -29,16 +29,67 @@ JaCoCo 0.8.16.
 **Setup:** `mvn verify` on the machine described above. The integration tests
 run against real containers - no in-memory database, no stubbed cache.
 
-| Metric | M1 | M3 | M5 | M6 | M7 |
-|---|---|---|---|---|---|
-| Tests passing | 52 | 266 | 327 | 385 | 399 |
-| Test classes | 6 | 22 | 27 | 32 | 33 |
-| Line coverage | 92.0 % | 89.8 % | 88.0 % | 84.7 % | 84.5 % (3510/4152) |
-| Branch coverage | 81.4 % | 74.6 % | 69.5 % | 65.6 % | 65.5 % (1162/1774) |
-| Instruction coverage | 92.1 % | 91.7 % | 89.4 % | 86.6 % | 86.3 % |
-| Method coverage | 87.2 % | 85.2 % | 87.4 % | 84.4 % | 84.3 % (840/996) |
-| Class coverage | 100 % | 97.6 % | 96.8 % | 97.6 % | 97.2 % (172/177) |
-| Coverage gate | pass | pass | pass | pass | pass (80 % lines) |
+| Metric | M1 | M3 | M5 | M6 | M7 | M8 |
+|---|---|---|---|---|---|---|
+| Tests passing (`mvn verify`) | 52 | 266 | 327 | 385 | 399 | **437** |
+| Test classes | 6 | 22 | 27 | 32 | 33 | **36** |
+| Line coverage | 92.0 % | 89.8 % | 88.0 % | 84.7 % | 84.5 % | **85.6 %** (3684/4305) |
+| Branch coverage | 81.4 % | 74.6 % | 69.5 % | 65.6 % | 65.5 % | 67.0 % (1248/1863) |
+| Instruction coverage | 92.1 % | 91.7 % | 89.4 % | 86.6 % | 86.3 % | 87.4 % |
+| Method coverage | 87.2 % | 85.2 % | 87.4 % | 84.4 % | 84.3 % | 85.6 % (865/1011) |
+| Class coverage | 100 % | 97.6 % | 96.8 % | 97.6 % | 97.2 % | 97.8 % (174/178) |
+| Coverage gate | pass | pass | pass | pass | pass | pass (80 % lines) |
+
+Plus 3 evaluation tests run separately under `-Peval`, and 7 Playwright
+end-to-end tests run against the full stack.
+
+## Security verification (milestone 8)
+
+**What:** the security properties the product claims, asserted rather than
+described.
+**Tool:** `SecurityHardeningIntegrationTest` (23 tests) and
+`CrossUserIsolationIntegrationTest` (8 tests), over real PostgreSQL and Redis.
+
+| Property | How it is verified | Result |
+|---|---|---|
+| One user cannot read another's data | second account tries every GET on an application, resume, fit check and email belonging to the first | all 404 |
+| One user cannot change another's data | second account tries edit, status change, note, delete, merge, activate, correct | all 404, and the owner's data asserted unchanged |
+| No response leaks another user's content | six list endpoints scanned for the other user's note, snippet, requisition id and user id | no leaks |
+| A client-supplied user id is ignored | `userId` in the request body | stored under the session's user |
+| CSRF is enforced | mutating request with the cookie but no header | 403 |
+| CORS is restricted | preflight from an unlisted origin | refused |
+| Hardening headers present | CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy | all present |
+| HSTS only behind TLS | header checked with `APP_SECURE_COOKIES=false` | absent, as intended |
+| Actuator is minimal | `env`, `beans`, `configprops`, `heapdump` | all 401 |
+| Errors leak nothing | malformed id | no class names, SQL or stack traces in the body |
+| Uploads are validated | `.txt` as a resume, `.exe` as a CSV | both refused |
+| Gmail scope is read-only | OAuth registration scopes | asserted, with a test that fails if a write scope is ever added |
+| Refresh tokens are unreadable at rest | ciphertext inspected | does not contain the token |
+
+## End-to-end tests (milestone 8)
+
+**What:** the journeys a user actually walks, against the full running stack
+(real frontend, real API, real database, seeded demo data).
+**Tool:** Playwright 1.65, Chromium.
+
+| Journey | Result |
+|---|---|
+| Start the demo from the landing page and reach a populated dashboard | pass |
+| List, search and open an application | pass |
+| Add an application by hand and find it in the table | pass |
+| Correct a classification and watch the review queue shrink | pass |
+| Fit checker explains its weights and refuses to score with no resume | pass |
+| Settings reports what the deployment can and cannot do | pass |
+| Signing out ends the session and the protected area bounces back | pass |
+
+**7 passed in 3.9 s.**
+
+Reproduce:
+
+```bash
+docker compose up -d --build
+cd frontend && E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+```
 
 Counts are for `mvn verify`, which excludes the evaluation harness; the
 `-Peval` runner is one further test that is run on its own because it writes
