@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "lighthouse": "node scripts/run-lighthouse.mjs"
+    "lighthouse": "node scripts/run-lighthouse.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.6",

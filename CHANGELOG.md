@@ -177,3 +177,14 @@ All notable changes to FastTrack. Format loosely follows
   performance and 100 accessibility on all four main pages.
 - The demo account now has a resume, so the Fit Checker demonstrates a real
   score instead of asking a visitor to upload one.
+
+### Milestone 10 - documentation and screenshots
+- Screenshots of every main page, captured from the seeded demo by a scripted
+  Playwright run (`npm run screenshots`) so they can be regenerated rather
+  than going stale.
+- README rewritten: why it exists, what it does, the measured results, the
+  engineering decisions worth knowing, and a Known limitations section that
+  states plainly what has not been measured or deployed.
+- docs/api.md (every endpoint, the auth handshake, the error contract) and
+  docs/deployment.md (two $0 paths, with the cross-origin cookie trap in
+  option B called out).
