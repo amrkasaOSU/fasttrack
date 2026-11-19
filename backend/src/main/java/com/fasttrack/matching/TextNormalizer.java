@@ -51,7 +51,17 @@ public class TextNormalizer {
     /** "Co-op", "co op", "coop" - all the same thing as an internship here. */
     private static final Pattern COOP = Pattern.compile("\\bco[\\s./-]?op(s)?\\b", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern BRACKETED = Pattern.compile("[\\(\\[\\{][^\\)\\]\\}]*[\\)\\]\\}]");
+    /**
+     * Only brackets whose contents are decoration get removed. "(Summer
+     * 2027)" and "(Req #12345)" say nothing about which role this is;
+     * "(iOS)" does, and stripping it merged two real postings in the matcher
+     * evaluation.
+     */
+    private static final Pattern BRACKETED_DECORATION = Pattern.compile(
+            "[\\(\\[\\{]\\s*(?:(?:spring|summer|fall|autumn|winter)[^\\)\\]\\}]*"
+            + "|(?:19|20)\\d{2}[^\\)\\]\\}]*"
+            + "|req[^\\)\\]\\}]*|job\\s*id[^\\)\\]\\}]*|r?\\d{4,}[^\\)\\]\\}]*)"
+            + "[\\)\\]\\}]", Pattern.CASE_INSENSITIVE);
     private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9 ]");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
@@ -64,7 +74,7 @@ public class TextNormalizer {
             return "";
         }
         String text = basicClean(raw);
-        text = BRACKETED.matcher(text).replaceAll(" ");
+        text = BRACKETED_DECORATION.matcher(text).replaceAll(" ");
         // Strip a trailing domain if the company arrived as an email domain.
         text = text.replaceAll("\\.(com|io|co|org|net|ai|dev)\\b", " ");
         text = NON_ALNUM.matcher(text).replaceAll(" ");
@@ -103,8 +113,13 @@ public class TextNormalizer {
             return "";
         }
         String text = basicClean(raw);
-        text = BRACKETED.matcher(text).replaceAll(" ");
+        text = BRACKETED_DECORATION.matcher(text).replaceAll(" ");
         text = COOP.matcher(text).replaceAll(" intern ");
+        // Spellings people genuinely use interchangeably.
+        text = text.replaceAll("\\bback[\\s-]end\\b", "backend")
+                   .replaceAll("\\bfront[\\s-]end\\b", "frontend")
+                   .replaceAll("\\bfull[\\s-]stack\\b", "fullstack")
+                   .replaceAll("\\bmachine[\\s-]learning\\b", "machinelearning");
         text = REQ_MARKER.matcher(text).replaceAll(" ");
         text = SEASON_YEAR.matcher(text).replaceAll(" ");
         text = YEAR.matcher(text).replaceAll(" ");
@@ -121,6 +136,65 @@ public class TextNormalizer {
             sb.append(canonicalWord(word));
         }
         return sb.toString().trim();
+    }
+
+    /**
+     * Details that are stripped for similarity but still distinguish two
+     * postings when both titles state them and they disagree: the season a
+     * posting is for, and the platform it targets.
+     *
+     * @param season  "summer", "fall", ... or null
+     * @param year    four-digit year, or null
+     * @param platform "ios", "android", "web", or null
+     */
+    public record Qualifiers(String season, String year, String platform) {
+
+        /** True when both sides state the same kind of qualifier and differ. */
+        public boolean conflictsWith(Qualifiers other) {
+            if (other == null) {
+                return false;
+            }
+            boolean seasonConflict = season != null && other.season != null && !season.equals(other.season);
+            boolean yearConflict = year != null && other.year != null && !year.equals(other.year);
+            boolean platformConflict = platform != null && other.platform != null
+                    && !platform.equals(other.platform);
+            return seasonConflict || yearConflict || platformConflict;
+        }
+    }
+
+    private static final Pattern SEASON_WORD = Pattern.compile(
+            "\\b(spring|summer|fall|autumn|winter)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PLATFORM_WORD = Pattern.compile(
+            "\\b(ios|android|web|mobile web|backend|frontend)\\b", Pattern.CASE_INSENSITIVE);
+
+    /** Reads the distinguishing details out of a raw, un-normalized title. */
+    public Qualifiers qualifiers(String rawTitle) {
+        if (rawTitle == null || rawTitle.isBlank()) {
+            return new Qualifiers(null, null, null);
+        }
+        String text = rawTitle.toLowerCase(Locale.ROOT);
+
+        var seasonMatcher = SEASON_WORD.matcher(text);
+        String season = seasonMatcher.find() ? seasonMatcher.group(1) : null;
+        if ("autumn".equals(season)) {
+            season = "fall";
+        }
+
+        var yearMatcher = YEAR.matcher(text);
+        String year = yearMatcher.find() ? yearMatcher.group() : null;
+
+        var platformMatcher = PLATFORM_WORD.matcher(text);
+        String platform = null;
+        while (platformMatcher.find()) {
+            String candidate = platformMatcher.group(1).replace(" ", "");
+            // Only the ones that really split a posting in two.
+            if (candidate.equals("ios") || candidate.equals("android")) {
+                platform = candidate;
+                break;
+            }
+        }
+
+        return new Qualifiers(season, year, platform);
     }
 
     /** The distinct words of a normalized string, in order of first appearance. */
@@ -150,7 +224,7 @@ public class TextNormalizer {
             case "sr", "senior" -> "senior";
             case "jr", "junior" -> "junior";
             case "mgr" -> "manager";
-            case "ml" -> "machine";
+            case "ml" -> "machinelearning";
             case "ai" -> "artificial";
             case "ux" -> "design";
             case "qa" -> "quality";

@@ -51,6 +51,18 @@ public class ApplicationMatcher {
     /** Between this and the threshold, attach but ask the user to confirm. */
     public static final double REVIEW_BAND = 0.45;
 
+    /**
+     * The decision for one pair of candidate applications, independent of the
+     * database. Exposed so the labeled evaluation measures exactly the logic
+     * production uses, rather than a reimplementation of it.
+     *
+     * @param same      the two describe one application
+     * @param uncertain same, but close enough to the line to ask the user
+     * @param score     title similarity, 0..1
+     * @param rule      which rule decided it
+     */
+    public record Comparison(boolean same, boolean uncertain, double score, String rule) {}
+
     private final ApplicationRepository applications;
     private final TextNormalizer normalizer;
 
@@ -91,9 +103,14 @@ public class ApplicationMatcher {
         }
 
         List<JobApplication> atCompany = applications.findAllByUserIdAndCompanyNormalized(userId, companyKey);
+        TextNormalizer.Qualifiers qualifiers = normalizer.qualifiers(positionTitle);
 
-        // Rule 2 - identical normalized title.
+        // Rule 2 - identical normalized title, unless a stated season or
+        // platform says these are two different postings.
         for (JobApplication candidate : atCompany) {
+            if (qualifiers.conflictsWith(normalizer.qualifiers(candidate.getPositionTitle()))) {
+                continue;
+            }
             if (!positionKey.isBlank() && candidate.getPositionNormalized().equals(positionKey)) {
                 return new MatchOutcome(candidate, false, false, "exact_title",
                         "Same role at " + candidate.getCompanyName());
@@ -104,6 +121,9 @@ public class ApplicationMatcher {
         JobApplication best = null;
         double bestScore = 0;
         for (JobApplication candidate : atCompany) {
+            if (qualifiers.conflictsWith(normalizer.qualifiers(candidate.getPositionTitle()))) {
+                continue;
+            }
             double score = similarity(positionKey, candidate.getPositionNormalized());
             if (score > bestScore) {
                 bestScore = score;
@@ -144,6 +164,60 @@ public class ApplicationMatcher {
 
         return new MatchOutcome(applications.save(created), true, positionUnknown, "new_application",
                 "No existing application matched, so a new one was created");
+    }
+
+    /**
+     * Compares two (company, position, requisition) triples with the same
+     * rules {@link #match} applies, and nothing else. Pure: no database, no
+     * side effects.
+     */
+    public Comparison compare(String companyA, String positionA, String requisitionA,
+                              String companyB, String positionB, String requisitionB) {
+
+        String companyKeyA = normalizer.normalizeCompany(companyA);
+        String companyKeyB = normalizer.normalizeCompany(companyB);
+
+        if (companyKeyA.isBlank() || companyKeyB.isBlank()) {
+            return new Comparison(false, false, 0, "no_company");
+        }
+        if (!companyKeyA.equals(companyKeyB)) {
+            return new Comparison(false, false, 0, "different_company");
+        }
+
+        // Two postings for different seasons, or for different mobile
+        // platforms, are two applications even when the rest of the title is
+        // identical. Normalization strips those words for similarity, so the
+        // check happens on the raw titles.
+        TextNormalizer.Qualifiers qualifiersA = normalizer.qualifiers(positionA);
+        if (qualifiersA.conflictsWith(normalizer.qualifiers(positionB))) {
+            return new Comparison(false, false, 0, "conflicting_qualifier");
+        }
+
+        boolean bothHaveRequisition = requisitionA != null && !requisitionA.isBlank()
+                && requisitionB != null && !requisitionB.isBlank();
+        if (bothHaveRequisition) {
+            // At one company a requisition id identifies the posting, so it
+            // settles the question in both directions.
+            boolean equal = requisitionA.trim().equalsIgnoreCase(requisitionB.trim());
+            return new Comparison(equal, false, equal ? 1 : 0,
+                    equal ? "requisition_id" : "different_requisition_id");
+        }
+
+        String positionKeyA = normalizer.normalizePosition(positionA);
+        String positionKeyB = normalizer.normalizePosition(positionB);
+
+        if (!positionKeyA.isBlank() && positionKeyA.equals(positionKeyB)) {
+            return new Comparison(true, false, 1, "exact_title");
+        }
+
+        double score = similarity(positionKeyA, positionKeyB);
+        if (score >= SIMILARITY_THRESHOLD) {
+            return new Comparison(true, false, score, "similar_title");
+        }
+        if (score >= REVIEW_BAND) {
+            return new Comparison(true, true, score, "similar_title_uncertain");
+        }
+        return new Comparison(false, false, score, "different_title");
     }
 
     /**

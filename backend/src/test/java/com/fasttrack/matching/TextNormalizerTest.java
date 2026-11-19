@@ -41,7 +41,10 @@ class TextNormalizerTest {
             "'Backend Engineer Intern [Req #12345]',              backend engineer intern",
             "'Data Engineer Intern - Fall 2026 Co-op',            data engineer intern",
             "'Software Developer Co-op',                          software engineer intern",
-            "'Machine Learning Engineer Intern 2027',             machine learning engineer intern"
+            "'Machine Learning Engineer Intern 2027',             machinelearning engineer intern",
+            "'ML Engineer Intern',                                machinelearning engineer intern",
+            "'Back End Engineer Intern',                          backend engineer intern",
+            "'Mobile Engineer Intern (iOS)',                      mobile engineer intern ios"
     })
     void positionNormalization(String raw, String expected) {
         assertThat(normalizer.normalizePosition(raw)).isEqualTo(expected);
@@ -84,6 +87,24 @@ class TextNormalizerTest {
         assertThat(normalizer.normalizeCompany("!!!")).isEmpty();
         assertThat(normalizer.normalizePosition(null)).isEmpty();
         assertThat(normalizer.normalizePosition("---")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a stated season or platform is kept as a qualifier, even though it is stripped for similarity")
+    void qualifiersAreExtracted() {
+        var summer = normalizer.qualifiers("Software Engineer Intern - Summer 2027");
+        var fall = normalizer.qualifiers("Software Engineer Intern - Fall 2027");
+        var ios = normalizer.qualifiers("Mobile Engineer Intern (iOS)");
+        var android = normalizer.qualifiers("Mobile Engineer Intern (Android)");
+        var plain = normalizer.qualifiers("Software Engineer Intern");
+
+        assertThat(summer.season()).isEqualTo("summer");
+        assertThat(summer.year()).isEqualTo("2027");
+        assertThat(summer.conflictsWith(fall)).as("summer vs fall is two postings").isTrue();
+        assertThat(ios.conflictsWith(android)).as("iOS vs Android is two postings").isTrue();
+        assertThat(summer.conflictsWith(plain)).as("one side silent is not a conflict").isFalse();
+        assertThat(plain.conflictsWith(null)).isFalse();
+        assertThat(normalizer.qualifiers(null).season()).isNull();
     }
 
     @Test

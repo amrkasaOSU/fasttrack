@@ -117,3 +117,39 @@ classifier, and the phrase lists were iterated against this set, so the
 rule-based numbers are in-sample and are an upper bound. The live-accuracy
 metric computed from real user corrections is the honest counterpart, and the
 LLM path is measured on the same set without tuning.
+
+## D-013 - Similarity threshold 0.60, chosen from the sweep
+**Decision:** two titles at the same company are the same application when
+their normalized token overlap (Jaccard) is at least 0.60; between 0.45 and
+0.60 they are attached but flagged for review; below that they are separate.
+**Why:** measured, not guessed. `MatcherEvaluationTest` scores every candidate
+threshold over 100 labeled pairs and prints the table (RESULTS.md). Precision
+collapses below 0.55 (16 false merges at 0.40) and recall decays above 0.65.
+0.60 is the middle of the stable band, so wording changes do not flip
+behaviour.
+**Why Jaccard rather than edit distance:** job titles differ by whole words
+("backend" vs "data"), not characters. Edit distance would score "data" and
+"date" as nearly identical and a reordered title as distant.
+**Why precision is favoured over recall:** a false merge silently folds two
+real applications into one and loses the history of one of them; a missed
+duplicate shows the user two rows they can merge in a click.
+
+## D-014 - A conflicting season or platform beats title similarity
+**Decision:** if both titles state a season (Summer vs Fall) or a mobile
+platform (iOS vs Android) and they disagree, the applications are different -
+even when the rest of the title is identical.
+**Why:** normalization strips seasons and bracketed asides so that "SWE Intern
+- Summer 2027" and "SWE Intern" match, which is right. But that stripping made
+"Mobile Engineer Intern (iOS)" and "(Android)" identical, which merged two real
+postings in the evaluation. Checking the raw titles for a *stated and
+disagreeing* qualifier keeps both behaviours.
+
+## D-015 - Live accuracy is reported with its caveat attached
+**Decision:** the "live accuracy" figure is the share of classifications the
+user has not corrected, and the API returns a `caveat` string saying so, which
+the UI displays.
+**Why:** the obvious framing - corrections divided by classifications - is
+flattering nonsense on its own, because emails nobody reviewed count as
+correct. Shipping the number without the caveat would be the kind of metric
+that looks good on a dashboard and means nothing. The offline evaluation
+measures accuracy properly; this measures disagreement, and says so.

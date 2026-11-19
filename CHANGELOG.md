@@ -78,3 +78,21 @@ All notable changes to FastTrack. Format loosely follows
   llm-setup.md (Groq free tier or local Ollama).
 - Fixed: the application failed to start when Google credentials were absent,
   which broke the "runs without Gmail" guarantee. Caught by the test suite.
+
+### Milestone 5 - matcher evaluation, review queue, corrections
+- The matcher's pair comparison is now a pure function, so the evaluation
+  measures the same code production runs.
+- 100 hand-labeled application pairs and a `-Peval` runner that reports
+  precision, recall, F1 and a full threshold sweep, which is what justifies
+  the 0.60 similarity threshold.
+- Normalization fixes found by that evaluation: "back end"/"backend" and
+  similar spellings folded; bracketed platform tags like "(iOS)" are kept
+  while "(Summer 2027)" is still stripped; a stated season or platform that
+  disagrees now blocks a match outright.
+- Needs review queue: low-confidence classifications and uncertain matches,
+  with the reason shown for each.
+- Corrections: a correction is recorded, the classification is rewritten, and
+  the application is re-derived - re-matched and re-run through the state
+  machine - so fixing an email actually fixes the tracker.
+- Live accuracy endpoint, returned with an explicit caveat that it measures
+  uncorrected share rather than verified accuracy.
