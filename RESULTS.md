@@ -40,6 +40,10 @@ run against real containers - no in-memory database, no stubbed cache.
 | Class coverage | 100 % | 100 % | 97.6 % | 96.6 % (112/116) |
 | Coverage gate | pass | pass | pass | pass (80 % lines) |
 
+Counts are for `mvn verify`, which excludes the evaluation harness; the
+`-Peval` runner is one further test that is run on its own because it writes
+report files.
+
 Reproduce:
 
 ```bash
