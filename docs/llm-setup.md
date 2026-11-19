@@ -54,5 +54,11 @@ the same thing in words.
 To measure what the model actually buys you on the 200-email evaluation set:
 
 ```bash
-cd backend && mvn -B -Peval test     # writes eval/results/classifier-llm.md
+./scripts/run-llm-eval.sh
 ```
+
+That script reads the key from `.env` (so it never goes on a command line or
+into a shell history), checks it reaches the provider before spending ten
+minutes finding out it does not, throttles the calls so a free tier's rate
+limit does not turn the run into a measurement of its own 429s, and prints
+the LLM result next to the rule-based baseline.

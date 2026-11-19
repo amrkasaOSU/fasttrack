@@ -56,6 +56,18 @@ class ClassifierEvaluationTest {
     private final EmailPrefilter prefilter = new EmailPrefilter();
     private final RuleBasedClassifier rules = new RuleBasedClassifier();
 
+    /**
+     * Pause between model calls, in milliseconds.
+     *
+     * <p>Free tiers rate limit by requests per minute. Without a pause the run
+     * collects 429s, the provider falls back to rules, and the report would
+     * then be measuring the fallback while claiming to measure the model -
+     * the worst possible outcome for an evaluation. Set {@code EVAL_THROTTLE_MS}
+     * to space the calls out; `scripts/run-llm-eval.sh` sets a sensible value.
+     */
+    private static final long THROTTLE_MS = Long.parseLong(
+            System.getenv().getOrDefault("EVAL_THROTTLE_MS", "0"));
+
     @Test
     @DisplayName("evaluate the classifier against the 200-email labeled set")
     void evaluate() throws IOException {
@@ -111,7 +123,14 @@ class ClassifierEvaluationTest {
         int errorsUnflagged = 0;
         double confidenceSum = 0;
 
+        int processed = 0;
         for (EvalEmail email : dataset) {
+            if (usingLlm && THROTTLE_MS > 0 && processed > 0) {
+                sleepQuietly(THROTTLE_MS);
+            }
+            if (usingLlm && ++processed % 25 == 0) {
+                System.out.printf("  ... %d/%d classified%n", processed, dataset.size());
+            }
             ClassificationResult result = usingLlm
                     ? classifier.classify(email.toContent(), null, false)
                     : rules.classify(email.toContent());
@@ -200,6 +219,11 @@ class ClassifierEvaluationTest {
         }
         AppProperties props = new AppProperties();
         props.getLlm().setApiKey(apiKey);
+        // More retries than production uses: a rate-limited call that falls
+        // back to rules would be recorded as an LLM result, which would make
+        // the whole measurement dishonest.
+        props.getLlm().setMaxRetries(4);
+        props.getLlm().setTimeoutSeconds(60);
         String baseUrl = System.getenv("OPENAI_BASE_URL");
         if (baseUrl != null && !baseUrl.isBlank()) {
             props.getLlm().setBaseUrl(baseUrl);
@@ -222,6 +246,14 @@ class ClassifierEvaluationTest {
             }
         }
         return emails;
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** Sub-millisecond values are reported honestly rather than as "0 ms". */

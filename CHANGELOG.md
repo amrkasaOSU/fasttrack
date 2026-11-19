@@ -189,6 +189,15 @@ All notable changes to FastTrack. Format loosely follows
   docs/deployment.md (two $0 paths, with the cross-origin cookie trap in
   option B called out).
 
+### LLM evaluation tooling
+- `scripts/run-llm-eval.sh`: reads the key from `.env`, probes the provider
+  before starting, throttles calls to stay inside a free tier's rate limit,
+  and prints the LLM result against the rule-based baseline.
+- The classifier evaluation now supports `EVAL_THROTTLE_MS` and uses more
+  retry headroom than production. Without that, a rate-limited call falls
+  back to the rules and would be recorded as an LLM result - the report would
+  be measuring the fallback while claiming to measure the model.
+
 ### Published
 - Repository published at https://github.com/amrkasaOSU/fasttrack and the CI
   badge pointed at it.
