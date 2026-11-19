@@ -13,4 +13,11 @@ public interface ApplicationEventRepository extends JpaRepository<ApplicationEve
     List<ApplicationEvent> findTop50ByUserIdOrderByOccurredAtDesc(UUID userId);
 
     long countByUserId(UUID userId);
+
+    /**
+     * Every status change the user has ever had. Used by the dashboard to work
+     * out how far each application really got, including ones that later ended
+     * in a rejection.
+     */
+    List<ApplicationEvent> findAllByUserIdAndEventType(UUID userId, ApplicationEventType eventType);
 }

@@ -39,7 +39,7 @@ public class DemoDataSeeder {
 
     /** Fixed so the demo is byte-identical across machines. */
     private static final long SEED = 20260216L;
-    static final int TARGET_APPLICATIONS = 60;
+    public static final int TARGET_APPLICATIONS = 60;
 
     private final ApplicationRepository applications;
     private final ApplicationEventRepository events;

@@ -124,3 +124,18 @@ All notable changes to FastTrack. Format loosely follows
 - Fixed: one `with(csrf())` in a new test replaced the shared CSRF repository
   and broke 19 unrelated tests - the real cookie handshake is now used
   everywhere, including multipart uploads.
+
+### Milestone 7 - dashboard and insights
+- Insights API: totals, applications per week, funnel, response rate by ATS
+  and by location type, time to first response and to rejection, action items
+  and the review count, all computed per user.
+- The funnel reads the append-only event history, so an application rejected
+  after an on-site still counts as having interviewed. Silence is reported as
+  its own outcome and never folded into rejections.
+- Every rate carries the counts it came from, and a rate over fewer than two
+  applications is not charted at all.
+- Fit-versus-outcome is withheld until at least eight fit checks are linked to
+  applications, with a line saying how many are needed.
+- Dashboard page: stat tiles, action items with countdowns, Recharts weekly
+  volume, funnel, and two response-rate charts, each with a text equivalent
+  next to it.

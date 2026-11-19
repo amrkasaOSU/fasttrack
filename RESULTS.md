@@ -29,16 +29,16 @@ JaCoCo 0.8.16.
 **Setup:** `mvn verify` on the machine described above. The integration tests
 run against real containers - no in-memory database, no stubbed cache.
 
-| Metric | M1 | M2 | M3 | M4 | M5 | M6 |
-|---|---|---|---|---|---|---|
-| Tests passing | 52 | 190 | 266 | 311 | 327 | 385 |
-| Test classes | 6 | 16 | 22 | 26 | 27 | 32 |
-| Line coverage | 92.0 % | 92.3 % | 89.8 % | 87.0 % | 88.0 % | 84.7 % (3343/3947) |
-| Branch coverage | 81.4 % | 76.7 % | 74.6 % | 67.8 % | 69.5 % | 65.6 % (1098/1674) |
-| Instruction coverage | 92.1 % | 92.9 % | 91.7 % | 88.8 % | 89.4 % | 86.6 % |
-| Method coverage | 87.2 % | 89.7 % | 85.2 % | 86.8 % | 87.4 % | 84.4 % (800/948) |
-| Class coverage | 100 % | 100 % | 97.6 % | 96.6 % | 96.8 % | 97.6 % (163/167) |
-| Coverage gate | pass | pass | pass | pass | pass | pass (80 % lines) |
+| Metric | M1 | M3 | M5 | M6 | M7 |
+|---|---|---|---|---|---|
+| Tests passing | 52 | 266 | 327 | 385 | 399 |
+| Test classes | 6 | 22 | 27 | 32 | 33 |
+| Line coverage | 92.0 % | 89.8 % | 88.0 % | 84.7 % | 84.5 % (3510/4152) |
+| Branch coverage | 81.4 % | 74.6 % | 69.5 % | 65.6 % | 65.5 % (1162/1774) |
+| Instruction coverage | 92.1 % | 91.7 % | 89.4 % | 86.6 % | 86.3 % |
+| Method coverage | 87.2 % | 85.2 % | 87.4 % | 84.4 % | 84.3 % (840/996) |
+| Class coverage | 100 % | 97.6 % | 96.8 % | 97.6 % | 97.2 % (172/177) |
+| Coverage gate | pass | pass | pass | pass | pass (80 % lines) |
 
 Counts are for `mvn verify`, which excludes the evaluation harness; the
 `-Peval` runner is one further test that is run on its own because it writes
