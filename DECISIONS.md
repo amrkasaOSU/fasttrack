@@ -153,3 +153,46 @@ flattering nonsense on its own, because emails nobody reviewed count as
 correct. Shipping the number without the caveat would be the kind of metric
 that looks good on a dashboard and means nothing. The offline evaluation
 measures accuracy properly; this measures disagreement, and says so.
+
+## D-016 - Fit score weights, and the two caps
+**Decision:** 50% required-skill coverage, 20% preferred, 15% experience
+relevance, 15% eligibility. A hard eligibility mismatch caps the total at 40;
+a posting with no readable skills caps it at 50.
+**Why the weights:** skills are what a posting actually screens on, and they
+are the part that can be measured objectively, so they carry 70%. Experience
+relevance is the part a model judges, so it is deliberately a minority of the
+score - a wrong judgement there can move the result by at most 15 points.
+**Why the hard cap:** a posting that requires citizenship, or graduation by a
+date the candidate cannot meet, is not an 80% fit however well the skills
+line up. Showing 80 with a red row underneath would be read as 80.
+**Why the unreadable cap:** measured. Before it existed, a posting saying only
+"bright, motivated students" scored 75, because the weights redistributed onto
+the components that are generous by default. Telling someone they are a strong
+fit for a posting the system could not read is the most misleading thing this
+product could do.
+
+## D-017 - Weights are redistributed, not scored as zero
+**Decision:** when a posting lists no preferred skills (or no required ones),
+that weight is spread over the remaining components, and the response explains
+it in a `weightingNote` the UI shows.
+**Why:** scoring a missing section as zero punishes the candidate for the
+posting's vagueness. Redistribution keeps the number meaningful, and saying so
+keeps it honest.
+
+## D-018 - Suggestions may never ask the user to claim something
+**Decision:** suggestions come in four kinds. SURFACE and REWORD may only
+refer to skills the resume already evidences; LEARN names a genuine gap and
+suggests building something or being honest in the interview; ELIGIBILITY
+states a requirement plainly. No suggestion may propose adding a skill,
+technology or metric the resume does not show.
+**Why:** a tool that nudges a student to pad their resume is worse than no
+tool. This is the product's one hard ethical line, so it is enforced by an
+automated check over the whole evaluation set rather than by review.
+
+## D-019 - Jaccard token overlap, not embeddings, for skill matching
+**Decision:** skills are matched by canonical name through a hand-written
+dictionary, not by semantic similarity.
+**Why:** an embedding model would need a key, a network call and a threshold
+nobody can explain, to solve a problem that is mostly spelling. The dictionary
+is explainable, free, instant and testable, and its failure mode (an unknown
+skill stays unmatched) is visible to the user rather than silent.

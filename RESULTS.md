@@ -29,16 +29,16 @@ JaCoCo 0.8.16.
 **Setup:** `mvn verify` on the machine described above. The integration tests
 run against real containers - no in-memory database, no stubbed cache.
 
-| Metric | M1 | M2 | M3 | M4 | M5 |
-|---|---|---|---|---|---|
-| Tests passing | 52 | 190 | 266 | 311 | 327 |
-| Test classes | 6 | 16 | 22 | 26 | 27 |
-| Line coverage | 92.0 % | 92.3 % | 89.8 % | 87.0 % | 88.0 % (2491/2830) |
-| Branch coverage | 81.4 % | 76.7 % | 74.6 % | 67.8 % | 69.5 % (810/1165) |
-| Instruction coverage | 92.1 % | 92.9 % | 91.7 % | 88.8 % | 89.4 % |
-| Method coverage | 87.2 % | 89.7 % | 85.2 % | 86.8 % | 87.4 % (626/716) |
-| Class coverage | 100 % | 100 % | 97.6 % | 96.6 % | 96.8 % (122/126) |
-| Coverage gate | pass | pass | pass | pass | pass (80 % lines) |
+| Metric | M1 | M2 | M3 | M4 | M5 | M6 |
+|---|---|---|---|---|---|---|
+| Tests passing | 52 | 190 | 266 | 311 | 327 | 385 |
+| Test classes | 6 | 16 | 22 | 26 | 27 | 32 |
+| Line coverage | 92.0 % | 92.3 % | 89.8 % | 87.0 % | 88.0 % | 84.7 % (3343/3947) |
+| Branch coverage | 81.4 % | 76.7 % | 74.6 % | 67.8 % | 69.5 % | 65.6 % (1098/1674) |
+| Instruction coverage | 92.1 % | 92.9 % | 91.7 % | 88.8 % | 89.4 % | 86.6 % |
+| Method coverage | 87.2 % | 89.7 % | 85.2 % | 86.8 % | 87.4 % | 84.4 % (800/948) |
+| Class coverage | 100 % | 100 % | 97.6 % | 96.6 % | 96.8 % | 97.6 % (163/167) |
+| Coverage gate | pass | pass | pass | pass | pass | pass (80 % lines) |
 
 Counts are for `mvn verify`, which excludes the evaluation harness; the
 `-Peval` runner is one further test that is run on its own because it writes
@@ -228,6 +228,62 @@ python3 scripts/generate_matcher_pairs.py
 cd backend && mvn -B -Peval test        # writes eval/results/matcher.md
 ```
 
-_Still to be measured: LLM classifier accuracy (needs an API key), fit-band
-agreement (M6), sync throughput in emails/minute at scale, k6 load results and
+## Fit scorer evaluation (milestone 6)
+
+**What:** does the scorer put a resume/posting pair in the band a person
+would, and does it ever suggest something dishonest?
+**Tool:** `FitScorerEvaluationTest` (`-Peval`) over `eval/fit_pairs.jsonl` -
+20 hand-labeled pairs built from five resume profiles (backend, data, ML,
+frontend, first-year) and eight postings, including two with hard eligibility
+blocks and one that states no requirements at all.
+**Setup:** no API key, so postings are read by the heuristic parser and the
+experience component uses the deterministic fallback. Bands were assigned by
+reading each pair before the scorer was run.
+
+| Measure | Value |
+|---|---:|
+| Exact band agreement | **13/20 (65 %)** |
+| Within one band | **20/20 (100 %)** |
+| More than one band out | **0** |
+| Suggestions that would have the user claim something unevidenced | **0 of all suggestions across 20 pairs** |
+
+The honesty check is the one that matters most. Every suggestion from every
+pair is scanned: a suggestion may never tell the user to add a skill, a
+technology or a number their resume does not already show. Gaps produce
+learning advice ("build something small with it before applying"), never
+"add this to your resume". This is asserted, not reviewed by hand.
+
+### What the evaluation changed
+
+Three real defects were found by running it, not by reading the code:
+
+1. **Eligibility data never reached the scorer.** The resume JSON used
+   snake_case keys (`expected_graduation`, `work_authorization`) while the
+   record expected camelCase, so every graduation and work-authorisation
+   check silently returned "unknown". A posting requiring 2026 graduation
+   scored a 2027 graduate at 84.
+2. **An unreadable posting scored highly.** With no skills extractable, the
+   weights redistributed onto experience and eligibility, and a posting
+   saying only "bright, motivated students" scored 75. There is now a cap of
+   50 for postings with no readable skills, and the response says why.
+3. **The no-model experience estimate was miscalibrated.** Raw word overlap
+   was used directly, so a 6 % overlap read as "6 % relevant" and pushed whole
+   scores a band low. It now maps into 0.30-0.80, keeping the ordering while
+   bounding a weak proxy's influence.
+
+**Read this honestly:** 20 pairs is a small set that I wrote and labeled
+myself, and the remaining seven disagreements are all one band low, which
+suggests the heuristic experience component is still conservative. The LLM
+path should improve exactly that component, and has not yet been measured -
+it needs an API key.
+
+Reproduce:
+
+```bash
+python3 scripts/generate_fit_pairs.py
+cd backend && mvn -B -Peval test     # writes eval/results/fit-scorer.md
+```
+
+_Still to be measured: LLM classifier accuracy and LLM fit scoring (both need
+an API key), sync throughput in emails/minute at scale, k6 load results and
 Lighthouse scores (M9)._

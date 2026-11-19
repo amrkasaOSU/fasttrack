@@ -96,3 +96,31 @@ All notable changes to FastTrack. Format loosely follows
   machine - so fixing an email actually fixes the tracker.
 - Live accuracy endpoint, returned with an explicit caveat that it measures
   uncorrected share rather than verified accuracy.
+
+### Milestone 6 - resume parsing, posting parsing, fit scorer
+- Resume upload: PDF only, 2 MB cap, text extracted with PDFBox, refusing
+  encrypted files and scans with a usable explanation. Versioned per user;
+  the newest is active. The PDF itself is not stored.
+- Resume structuring by the model with a heuristic fallback, always shown to
+  the user for correction before anything is scored.
+- Job postings: pasted text (primary) or a fetched URL (Jsoup, sanitised,
+  with an honest failure when the page needs JavaScript).
+- Skill dictionary: ~90 canonical skills with aliases ("Postgres" =
+  "PostgreSQL", "k8s" = "Kubernetes") and one-way supersets ("Spring Boot"
+  implies Spring and Java).
+- Deterministic fit score: 50% required coverage, 20% preferred, 15%
+  experience relevance, 15% eligibility; a hard eligibility mismatch caps the
+  total at 40, and a posting with no readable skills caps it at 50.
+- Honest suggestions only, enforced by an automated check across the whole
+  evaluation set: gaps produce learning advice, never "add this to your
+  resume".
+- 20 hand-labeled resume/posting pairs and an eval runner reporting band
+  agreement and the honesty check.
+- Fit Checker page: upload, parsed-skills review, paste or link a posting,
+  and a full breakdown of how the score was reached.
+- Fixed by the evaluation: a JSON field-naming mismatch that silently
+  disabled every eligibility check, a vague posting scoring 75, and a
+  miscalibrated fallback experience rating.
+- Fixed: one `with(csrf())` in a new test replaced the shared CSRF repository
+  and broke 19 unrelated tests - the real cookie handshake is now used
+  everywhere, including multipart uploads.

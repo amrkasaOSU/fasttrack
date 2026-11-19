@@ -63,8 +63,20 @@ public final class TestBrowser {
     }
 
     public ResultActions upload(String path, String filename, String content) throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", filename, "text/csv", content.getBytes(StandardCharsets.UTF_8));
+        return upload(path, filename, "text/csv", content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Multipart upload with the real CSRF handshake.
+     *
+     * <p>Spring Security's {@code with(csrf())} post-processor must not be
+     * used here: it replaces the CSRF token repository on the shared filter
+     * chain for the whole application context, which silently breaks every
+     * later test that uses the real cookie.
+     */
+    public ResultActions upload(String path, String filename, String contentType, byte[] bytes)
+            throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", filename, contentType, bytes);
         return send(MockMvcRequestBuilders.multipart(path).file(file));
     }
 

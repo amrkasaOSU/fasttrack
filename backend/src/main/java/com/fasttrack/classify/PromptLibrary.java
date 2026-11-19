@@ -23,7 +23,14 @@ import org.springframework.stereotype.Component;
 public class PromptLibrary {
 
     public static final String CLASSIFY_VERSION = "v1";
+    public static final String RESUME_VERSION = "v1";
+    public static final String POSTING_VERSION = "v1";
+    public static final String EXPERIENCE_VERSION = "v1";
+
     private static final String CLASSIFY_TEMPLATE = "prompts/classify_v1.txt";
+    private static final String RESUME_TEMPLATE = "prompts/parse_resume_v1.txt";
+    private static final String POSTING_TEMPLATE = "prompts/parse_posting_v1.txt";
+    private static final String EXPERIENCE_TEMPLATE = "prompts/rate_experience_v1.txt";
     private static final DateTimeFormatter RECEIVED =
             DateTimeFormatter.ofPattern("EEEE d MMMM yyyy 'at' HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
@@ -42,6 +49,33 @@ public class PromptLibrary {
                 .replace("{{subject}}", nullSafe(email.subject()))
                 .replace("{{received}}", email.receivedAt() == null ? "unknown" : RECEIVED.format(email.receivedAt()))
                 .replace("{{body}}", email.truncatedBody());
+    }
+
+    public String resumeSystemPrompt() {
+        return sections(RESUME_TEMPLATE)[0];
+    }
+
+    public String resumeUserPrompt(String resumeText) {
+        return sections(RESUME_TEMPLATE)[1].replace("{{resume_text}}", nullSafe(resumeText));
+    }
+
+    public String postingSystemPrompt() {
+        return sections(POSTING_TEMPLATE)[0];
+    }
+
+    public String postingUserPrompt(String postingText) {
+        return sections(POSTING_TEMPLATE)[1].replace("{{posting_text}}", nullSafe(postingText));
+    }
+
+    public String experienceSystemPrompt() {
+        return sections(EXPERIENCE_TEMPLATE)[0];
+    }
+
+    public String experienceUserPrompt(String postingTitle, String responsibilities, String narrative) {
+        return sections(EXPERIENCE_TEMPLATE)[1]
+                .replace("{{posting_title}}", nullSafe(postingTitle))
+                .replace("{{responsibilities}}", nullSafe(responsibilities))
+                .replace("{{narrative}}", nullSafe(narrative));
     }
 
     /**
