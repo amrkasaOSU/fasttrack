@@ -106,7 +106,7 @@ test.describe("FastTrack demo", () => {
       .toBeLessThan(before);
   });
 
-  test("the fit checker explains itself and refuses to score without a resume", async ({ page }) => {
+  test("the fit checker scores a posting and shows how it got there", async ({ page }) => {
     await startDemo(page);
     await page.getByRole("link", { name: "Fit checker" }).click();
     await page.waitForURL("**/fit");
@@ -114,16 +114,24 @@ test.describe("FastTrack demo", () => {
     await expect(page.getByRole("heading", { name: "Fit checker" })).toBeVisible();
     // The scoring legend is always shown, so the number is never a black box.
     await expect(page.getByText(/50% required skills/)).toBeVisible();
+    // The demo account ships with a resume, so a score is expected.
+    await expect(page.getByText(/skills found/)).toBeVisible();
 
     await page
       .getByLabel("Paste the posting")
       .fill(
-        "Software Engineer Intern - Summer 2027\n\nRequirements\n- Java\n- SQL\n- Pursuing a Bachelor's degree in Computer Science\n\nPreferred qualifications\n- Spring Boot\n- Docker\n",
+        "Software Engineer Intern - Summer 2027\n\nResponsibilities\n- Build REST APIs in Java and Spring Boot\n\nRequirements\n- Java\n- SQL\n- Pursuing a Bachelor's degree in Computer Science\n\nPreferred qualifications\n- Spring Boot\n- Docker\n",
       );
     await page.getByRole("button", { name: "Check fit" }).click();
 
-    // The demo account has no resume, so the product must say so plainly.
-    await expect(page.getByText(/Upload a resume first/)).toBeVisible();
+    // A score, a band, the component breakdown, and honest advice.
+    await expect(page.getByText("How the score was reached")).toBeVisible();
+    await expect(page.getByText(/Required skills \(50%\)/)).toBeVisible();
+    await expect(page.getByText(/Experience relevance \(15%\)/)).toBeVisible();
+    await expect(page.getByText("What to do about it")).toBeVisible();
+    await expect(
+      page.getByText(/never tell you to claim a skill you do not have/),
+    ).toBeVisible();
   });
 
   test("settings reports what this deployment can and cannot do", async ({ page }) => {

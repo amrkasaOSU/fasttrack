@@ -1,6 +1,6 @@
 # Sync throughput
 
-Generated 2026-11-19T06:41:20.737024Z
+Generated 2026-11-19T06:53:05.016484Z
 
 | Setting | Value |
 |---|---|
@@ -12,9 +12,9 @@ Generated 2026-11-19T06:41:20.737024Z
 
 | Measure | Value |
 |---|---:|
-| Wall-clock time | 4.63 s |
-| Throughput | **3888 emails/minute** |
-| Per message | 15.4 ms |
+| Wall-clock time | 3.70 s |
+| Throughput | **4864 emails/minute** |
+| Per message | 12.3 ms |
 | Kept by the prefilter | 225 |
 | Dropped by the prefilter | 75 (25%) |
 | Applications created | 225 |
