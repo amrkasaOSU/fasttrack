@@ -23,6 +23,7 @@ public class AppProperties {
     private String tokenEncryptionKey = "";
 
     private Google google = new Google();
+    private Gmail gmail = new Gmail();
     private Llm llm = new Llm();
     private Sync sync = new Sync();
     private RateLimit rateLimit = new RateLimit();
@@ -43,6 +44,20 @@ public class AppProperties {
         public void setClientId(String clientId) { this.clientId = clientId; }
         public String getClientSecret() { return clientSecret; }
         public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
+    }
+
+    /**
+     * Gmail endpoints. Overridable so the sync can be tested end to end
+     * against a stub; the defaults are Google's real endpoints.
+     */
+    public static class Gmail {
+        private String rootUrl = "https://gmail.googleapis.com/";
+        private String tokenUri = "https://oauth2.googleapis.com/token";
+
+        public String getRootUrl() { return rootUrl; }
+        public void setRootUrl(String rootUrl) { this.rootUrl = rootUrl; }
+        public String getTokenUri() { return tokenUri; }
+        public void setTokenUri(String tokenUri) { this.tokenUri = tokenUri; }
     }
 
     public static class Llm {
@@ -118,6 +133,8 @@ public class AppProperties {
     public void setTokenEncryptionKey(String tokenEncryptionKey) { this.tokenEncryptionKey = tokenEncryptionKey; }
     public Google getGoogle() { return google; }
     public void setGoogle(Google google) { this.google = google; }
+    public Gmail getGmail() { return gmail; }
+    public void setGmail(Gmail gmail) { this.gmail = gmail; }
     public Llm getLlm() { return llm; }
     public void setLlm(Llm llm) { this.llm = llm; }
     public Sync getSync() { return sync; }

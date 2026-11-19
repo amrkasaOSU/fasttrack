@@ -29,16 +29,16 @@ JaCoCo 0.8.16.
 **Setup:** `mvn verify` on the machine described above. The integration tests
 run against real containers - no in-memory database, no stubbed cache.
 
-| Metric | Milestone 1 | Milestone 2 | Milestone 3 |
-|---|---|---|---|
-| Tests passing | 52 | 190 | 266 |
-| Test classes | 6 | 16 | 22 |
-| Line coverage | 92.0 % | 92.3 % | 89.8 % (1628/1812) |
-| Branch coverage | 81.4 % | 76.7 % | 74.6 % (538/721) |
-| Instruction coverage | 92.1 % | 92.9 % | 91.7 % (9399/10245) |
-| Method coverage | 87.2 % | 89.7 % | 85.2 % (414/486) |
-| Class coverage | 100 % | 100 % | 97.6 % (81/83) |
-| Coverage gate | 80 % lines - passes | 80 % lines - passes | 80 % lines - passes |
+| Metric | M1 | M2 | M3 | M4 |
+|---|---|---|---|---|
+| Tests passing | 52 | 190 | 266 | 311 |
+| Test classes | 6 | 16 | 22 | 26 |
+| Line coverage | 92.0 % | 92.3 % | 89.8 % | 87.0 % (2285/2626) |
+| Branch coverage | 81.4 % | 76.7 % | 74.6 % | 67.8 % (715/1055) |
+| Instruction coverage | 92.1 % | 92.9 % | 91.7 % | 88.8 % (12323/13871) |
+| Method coverage | 87.2 % | 89.7 % | 85.2 % | 86.8 % (587/676) |
+| Class coverage | 100 % | 100 % | 97.6 % | 96.6 % (112/116) |
+| Coverage gate | pass | pass | pass | pass (80 % lines) |
 
 Reproduce:
 
@@ -138,6 +138,38 @@ cd backend && mvn -B -Peval test              # writes eval/results/classifier-r
 With a key set (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `LLM_MODEL`), the same
 command measures the LLM path and writes `eval/results/classifier-llm.md`.
 
+## Gmail sync (milestone 4)
+
+**What:** the sync pipeline end to end - fetch, prefilter, classify, match,
+update - against a stubbed Gmail that speaks the real wire format.
+**Tool:** `GmailSyncIntegrationTest` (16 tests) with WireMock standing in for
+the Gmail API and Google's token endpoint, over real PostgreSQL and Redis.
+**Setup:** no LLM key, so the deterministic classifier runs; no Google account
+needed.
+
+| Property verified | How |
+|---|---|
+| Bodies are never stored | asserted on every stored row after a sync |
+| A message is processed at most once | a second full sync over the same mailbox adds 0 rows |
+| The history cursor advances only on success | cursor read before listing, asserted after |
+| Incremental sync uses `history.list` | asserted by request count against the stub |
+| A transient 429 is retried | flaky stub answers 429 then 200; the message still lands |
+| One broken message does not abort the run | 3 messages, middle one 500s, other 2 processed |
+| A revoked grant stops syncing and asks to reconnect | token endpoint returns `invalid_grant` |
+| The stored refresh token is unreadable | ciphertext asserted not to contain the token |
+| Disconnecting keeps the applications already found | counted before and after |
+
+Token encryption is covered separately by `TokenEncryptionServiceTest` (10
+tests): round trip, fresh nonce per encryption, tamper detection, wrong key
+rejected, and refusal to store anything when no key is configured.
+
+Reproduce:
+
+```bash
+cd backend && mvn -B test -Dtest='GmailSyncIntegrationTest,TokenEncryptionServiceTest'
+```
+
 _Still to be measured: LLM classifier accuracy (needs an API key), matcher
-precision/recall (M5), fit-band agreement (M6), k6 load results and Lighthouse
-scores (M9)._
+precision/recall on 100 labeled pairs (M5), fit-band agreement (M6), sync
+throughput in emails/minute at scale, k6 load results and Lighthouse scores
+(M9)._

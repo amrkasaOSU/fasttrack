@@ -57,3 +57,24 @@ All notable changes to FastTrack. Format loosely follows
   per-category precision/recall/F1, a confusion matrix, latency percentiles,
   prefilter drop rate and review-queue effectiveness.
 - Docs: ai.md (prompts, schema, fallbacks, caching, evaluation caveats).
+
+### Milestone 4 - Gmail OAuth, encrypted tokens, sync
+- Refresh tokens encrypted at rest with AES-256-GCM, a fresh nonce per
+  encryption, and a flat refusal to store anything when no key is configured.
+- Gmail access through the official client, restricted to list/get/history/
+  profile - there is no code path that can send, label or delete mail.
+- Sync: 120-day window on first run, then Gmail's historyId as the cursor;
+  idempotent by unique index; per-message transactions; exponential backoff on
+  429 and 5xx; a revoked grant marks the account for reconnection.
+- Duplicate matcher: requisition id, exact normalized title, token-similarity
+  match, and an uncertainty band that attaches but asks for review.
+- Scheduled sync every 15 minutes, plus an immediate first sync when a mailbox
+  is connected.
+- Per-user rate limiting in Redis for sync.
+- Settings API and page: connection state, sync now, disconnect (revoking the
+  grant at Google), stored-data counts, and "Delete all my data" with a typed
+  confirmation.
+- Docs: google-setup.md (free Testing-mode setup, step by step) and
+  llm-setup.md (Groq free tier or local Ollama).
+- Fixed: the application failed to start when Google credentials were absent,
+  which broke the "runs without Gmail" guarantee. Caught by the test suite.
