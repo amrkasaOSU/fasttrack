@@ -1,0 +1,9 @@
+# FastTrack is a personal application tracker. Everything behind the landing
+# page needs a session, so there is nothing useful for a crawler to index.
+User-agent: *
+Allow: /$
+Disallow: /dashboard
+Disallow: /applications
+Disallow: /fit
+Disallow: /review
+Disallow: /settings
