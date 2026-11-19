@@ -1,6 +1,7 @@
 package com.fasttrack.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasttrack.application.dto.ApplicationRequests.AddNote;
@@ -181,13 +182,14 @@ class ApplicationServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(merged.status()).isEqualTo(ApplicationStatus.INTERVIEW_SCHEDULED);
         assertThat(merged.requisitionId()).isEqualTo("JR999");
         assertThat(merged.location()).isEqualTo("Seattle, WA");
-        // Compared at microsecond precision, which is what PostgreSQL's
-        // timestamptz stores. On Linux, Instant.now() has nanosecond
-        // resolution, so the in-memory value and the round-tripped one differ
-        // in their last digits - a test that asserted exact equality passed on
-        // macOS and failed on the CI runner.
-        assertThat(merged.appliedAt().truncatedTo(ChronoUnit.MICROS))
-                .isEqualTo(source.appliedAt().truncatedTo(ChronoUnit.MICROS));
+        // The claim being tested is "the merge adopted the source's earlier
+        // applied date", so it is asserted with a tolerance rather than as
+        // exact equality. Instant.now() has nanosecond resolution on Linux,
+        // PostgreSQL's timestamptz stores microseconds and *rounds* to get
+        // there, so an in-memory value and the same value after a round trip
+        // legitimately differ in the last digit.
+        assertThat(merged.appliedAt())
+                .isCloseTo(source.appliedAt(), within(1, ChronoUnit.MILLIS));
         assertThat(applications.findById(source.id())).isEmpty();
         assertThat(applications.findById(target.id()).orElseThrow().getNotes())
                 .isEqualTo("target note\nsource note");

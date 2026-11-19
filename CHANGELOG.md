@@ -194,5 +194,7 @@ All notable changes to FastTrack. Format loosely follows
   badge pointed at it.
 - Fixed a test that compared a database round-trip against an in-memory
   `Instant.now()`: PostgreSQL stores microseconds while Linux gives
-  nanoseconds, so it passed on macOS and failed on the CI runner. Found by
-  the first CI run, which is what CI is for.
+  nanoseconds, so it passed on macOS and failed on the CI runner. The first
+  fix truncated to microseconds and still failed, because PostgreSQL *rounds*
+  rather than truncates; the assertion now states what it actually means -
+  that the merge adopted the earlier date - with a millisecond tolerance.
