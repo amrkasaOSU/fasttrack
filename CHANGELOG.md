@@ -189,6 +189,18 @@ All notable changes to FastTrack. Format loosely follows
   docs/deployment.md (two $0 paths, with the cross-origin cookie trap in
   option B called out).
 
+### Repository presentation
+- MIT LICENSE added - the OpenAPI document already claimed MIT, so the file
+  was missing rather than the licence being undecided.
+- A recorded demo GIF at the top of the README, produced by a scripted
+  Playwright run (`npm run demo-gif`) so it can be regenerated rather than
+  going stale.
+- README now opens with a one-minute summary and a clone-and-run block, and
+  gained a "Where to look first" table pointing a reviewer at the five files
+  that carry the design.
+- Repository topics and a shorter description, so the project is findable and
+  reads properly in search results.
+
 ### LLM evaluation tooling
 - `scripts/run-llm-eval.sh`: reads the key from `.env`, probes the provider
   before starting, throttles calls to stay inside a free tier's rate limit,

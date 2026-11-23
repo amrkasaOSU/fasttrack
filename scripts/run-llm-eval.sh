@@ -18,10 +18,29 @@ if [[ ! -f .env ]]; then
 fi
 
 # Only the three variables this needs, so nothing else in .env leaks in.
-set -a
-# shellcheck disable=SC1090
-source <(grep -E '^(OPENAI_API_KEY|OPENAI_BASE_URL|LLM_MODEL)=' .env)
-set +a
+#
+# Values are trimmed of surrounding whitespace and quotes before export. A key
+# pasted into a file picks those up easily, and the failure is nasty: shell
+# treats `KEY= value` as an empty assignment, while docker compose keeps the
+# space and sends it as part of the Bearer token. Both look like a rejected
+# key rather than a formatting slip.
+read_env() {
+  local name="$1" line value
+  line=$(grep -E "^${name}=" .env | tail -1) || true
+  [[ -z "$line" ]] && return 0
+  value="${line#*=}"
+  value="${value#"${value%%[![:space:]]*}"}"   # leading whitespace
+  value="${value%"${value##*[![:space:]]}"}"   # trailing whitespace
+  if [[ ${#value} -ge 2 && "${value:0:1}" == "${value: -1}" && "${value:0:1}" =~ ^[\"\']$ ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
+
+OPENAI_API_KEY="$(read_env OPENAI_API_KEY)"
+OPENAI_BASE_URL="$(read_env OPENAI_BASE_URL)"
+LLM_MODEL="$(read_env LLM_MODEL)"
+export OPENAI_API_KEY OPENAI_BASE_URL LLM_MODEL
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   cat >&2 <<'MSG'

@@ -6,7 +6,35 @@
 
 Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Next.js 16 · TypeScript · Docker
 
-![Dashboard](docs/screenshots/dashboard.png)
+![FastTrack in use](docs/screenshots/demo.gif)
+
+<sub>Demo account: sign in, dashboard, applications, one application's email-built timeline, and the review queue.</sub>
+
+---
+
+## In one minute
+
+- **It reads a mailbox and keeps 150+ applications current by itself** -
+  read-only Gmail access, ten-category classification, and an append-only
+  history where every status change links to the email that caused it.
+- **96.5 % classification accuracy and 0.954 macro F1**, measured on a
+  200-email labeled set - and every one of the classifier's mistakes was
+  caught by a confidence threshold before it could change a status.
+- **897 requests/second with zero failures at 250 concurrent users**, over
+  60,143 requests. 437 tests, 85.6 % coverage, four CI jobs including
+  Playwright against a real Docker stack.
+- **It works with no AI key and no Gmail connection**, falling back to a
+  deterministic classifier that is maintained as a first-class component and
+  published as the baseline the LLM is measured against.
+
+```bash
+git clone https://github.com/amrkasaOSU/fasttrack && cd fasttrack
+cp .env.example .env && docker compose up --build
+```
+
+Then open <http://localhost:3000> and press **Try the demo** - 60
+applications, 136 emails and a resume are already seeded, so there is
+something to look at in the first ten seconds.
 
 ---
 
@@ -60,12 +88,16 @@ sign-up.
 
 | | |
 |---|---|
-| **Applications** - searchable, filterable, with the status of each | **Application detail** - the full timeline, built from email |
-| ![Applications](docs/screenshots/applications.png) | ![Application detail](docs/screenshots/application-detail.png) |
-| **Fit checker** - the score, and exactly how it was reached | **Needs review** - what the classifier was unsure about |
-| ![Fit checker](docs/screenshots/fit-checker.png) | ![Needs review](docs/screenshots/needs-review.png) |
-| **Settings** - connection state, what is stored, and how to delete it | **Mobile** - the layout is responsive, not a desktop page shrunk |
-| ![Settings](docs/screenshots/settings.png) | <img src="docs/screenshots/dashboard-mobile.png" width="260" alt="Dashboard on a phone"> |
+| **Dashboard** - totals, funnel, follow-ups, all computed per user | **Applications** - searchable, filterable, with the status of each |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Applications](docs/screenshots/applications.png) |
+| **Application detail** - the full timeline, built from email | **Fit checker** - the score, and exactly how it was reached |
+| ![Application detail](docs/screenshots/application-detail.png) | ![Fit checker](docs/screenshots/fit-checker.png) |
+| **Needs review** - what the classifier was unsure about | **Settings** - connection state, what is stored, how to delete it |
+| ![Needs review](docs/screenshots/needs-review.png) | ![Settings](docs/screenshots/settings.png) |
+
+**Mobile** - the layout is responsive, not a desktop page shrunk:
+
+<img src="docs/screenshots/dashboard-mobile.png" width="280" alt="Dashboard on a phone">
 
 ## Results
 
@@ -146,6 +178,22 @@ through prefilter, classifier, matcher and database.
   all 404, and the responses are scanned for leaked content.
 - **The prompt is a versioned file**, and its version is part of the cache
   key - so a prompt change can never be mixed with results from the old one.
+
+## Where to look first
+
+If you are reviewing the code rather than running it, these five files carry
+most of the thinking:
+
+| File | Why it is worth a look |
+|---|---|
+| [`ApplicationStateMachine.java`](backend/src/main/java/com/fasttrack/application/ApplicationStateMachine.java) | Three rules - forward only, silence is never a rejection, terminal states are user-only - and the reasoning for each |
+| [`EmailClassificationService.java`](backend/src/main/java/com/fasttrack/classify/EmailClassificationService.java) | The degradation path: cache, model, one retry, deterministic fallback. A classification always comes back |
+| [`FitScoreCalculator.java`](backend/src/main/java/com/fasttrack/fit/FitScoreCalculator.java) | The scoring arithmetic, the two caps, and the rule that a suggestion may never ask you to claim something |
+| [`CrossUserIsolationIntegrationTest.java`](backend/src/test/java/com/fasttrack/security/CrossUserIsolationIntegrationTest.java) | One account tries every read and write against another's data; responses are also scanned for leaked content |
+| [`ClassifierEvaluationTest.java`](backend/src/test/java/com/fasttrack/eval/ClassifierEvaluationTest.java) | How the accuracy numbers in this README are produced, including the caveats printed into the report |
+
+And two documents: [DECISIONS.md](DECISIONS.md) for why things are the way
+they are, [RESULTS.md](RESULTS.md) for every number and how to reproduce it.
 
 ## Documentation
 
