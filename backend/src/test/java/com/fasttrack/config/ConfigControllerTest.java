@@ -50,7 +50,7 @@ class ConfigControllerTest {
         var configured = new ConfigController(propsWith("", "", "", "sk-test")).get();
 
         assertThat(configured.llmConfigured()).isTrue();
-        assertThat(configured.llmModel()).isEqualTo("llama-3.3-70b-versatile");
+        assertThat(configured.llmModel()).isEqualTo("openai/gpt-oss-120b");
     }
 
     @Test

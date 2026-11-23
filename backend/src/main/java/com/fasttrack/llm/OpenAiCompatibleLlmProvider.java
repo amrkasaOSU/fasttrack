@@ -34,6 +34,9 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmProvider.class);
 
+    /** Longest we will wait on a provider's own instruction before giving up. */
+    private static final long MAX_SERVER_DELAY_MS = 60_000;
+
     private final AppProperties.Llm config;
     private final ObjectMapper mapper;
     private final HttpClient http;
@@ -84,6 +87,18 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     throw lastFailure;
                 }
                 log.warn("LLM call failed with HTTP {} (attempt {}/{})", status, attempt, maxAttempts);
+
+                // A rate-limited provider usually says how long to wait. Blind
+                // exponential backoff caps out in seconds, while a token-budget
+                // reset can be a minute away - so honouring the header is the
+                // difference between waiting and silently degrading to the
+                // fallback classifier.
+                long serverDelay = retryAfterMillis(response);
+                if (serverDelay > 0 && attempt < maxAttempts) {
+                    log.info("Provider asked to wait {} ms before retrying", serverDelay);
+                    sleep(Math.min(serverDelay, MAX_SERVER_DELAY_MS));
+                    continue;
+                }
             } catch (LlmUnavailableException ex) {
                 if (!ex.isRetryable()) {
                     throw ex;
@@ -166,12 +181,66 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         }
     }
 
+    /**
+     * How long the provider asked us to wait, in milliseconds.
+     *
+     * <p>{@code Retry-After} is either a number of seconds or an HTTP date;
+     * OpenAI-compatible hosts also send {@code x-ratelimit-reset-*} in forms
+     * like {@code 2.5s} or {@code 1m30s}. Anything unparseable returns 0, and
+     * the caller falls back to its own backoff.
+     */
+    private long retryAfterMillis(HttpResponse<String> response) {
+        long fromRetryAfter = response.headers().firstValue("retry-after")
+                .map(this::parseDelay).orElse(0L);
+        if (fromRetryAfter > 0) {
+            return fromRetryAfter;
+        }
+        return response.headers().firstValue("x-ratelimit-reset-tokens")
+                .map(this::parseDelay).orElse(0L);
+    }
+
+    long parseDelay(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        String trimmed = value.trim();
+        try {
+            // Plain seconds, the common Retry-After form.
+            return (long) (Double.parseDouble(trimmed) * 1000);
+        } catch (NumberFormatException ignored) {
+            // Fall through to the duration forms below.
+        }
+
+        // Forms like "1m30s", "577ms", "2.5s".
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(\\d+(?:\\.\\d+)?)(ms|s|m|h)")
+                .matcher(trimmed.toLowerCase(java.util.Locale.ROOT));
+        long total = 0;
+        boolean matched = false;
+        while (matcher.find()) {
+            matched = true;
+            double amount = Double.parseDouble(matcher.group(1));
+            total += switch (matcher.group(2)) {
+                case "ms" -> (long) amount;
+                case "s" -> (long) (amount * 1000);
+                case "m" -> (long) (amount * 60_000);
+                case "h" -> (long) (amount * 3_600_000);
+                default -> 0L;
+            };
+        }
+        return matched ? total : 0;
+    }
+
     /** Exponential backoff with jitter: ~250ms, ~500ms, ~1s, capped at 4s. */
     private void backoff(int attempt) {
         long base = Math.min(250L * (1L << (attempt - 1)), 4000L);
         long jitter = ThreadLocalRandom.current().nextLong(50, 200);
+        sleep(base + jitter);
+    }
+
+    private void sleep(long millis) {
         try {
-            Thread.sleep(base + jitter);
+            Thread.sleep(millis);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }

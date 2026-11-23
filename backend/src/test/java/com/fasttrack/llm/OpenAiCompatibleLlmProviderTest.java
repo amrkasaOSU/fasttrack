@@ -185,6 +185,58 @@ class OpenAiCompatibleLlmProviderTest {
     }
 
     @Test
+    @DisplayName("a 429 carrying Retry-After is obeyed rather than guessed at")
+    void honoursRetryAfter() {
+        server.stubFor(post(urlEqualTo(PATH))
+                .inScenario("retry-after").whenScenarioStateIs("Started")
+                .willReturn(aResponse().withStatus(429).withHeader("Retry-After", "1"))
+                .willSetStateTo("second"));
+        server.stubFor(post(urlEqualTo(PATH))
+                .inScenario("retry-after").whenScenarioStateIs("second")
+                .willReturn(aResponse().withStatus(200).withBody(completion("ok"))));
+
+        long started = System.currentTimeMillis();
+        var response = provider().complete(LlmRequest.json("s", "u", LlmPurpose.CLASSIFY_EMAIL));
+        long elapsed = System.currentTimeMillis() - started;
+
+        assertThat(response.content()).isEqualTo("ok");
+        // Plain exponential backoff would have waited ~250 ms; the server said one second.
+        assertThat(elapsed).as("waited the time the provider asked for").isGreaterThanOrEqualTo(900);
+    }
+
+    @Test
+    @DisplayName("the rate-limit reset header is used when Retry-After is absent")
+    void fallsBackToResetHeader() {
+        server.stubFor(post(urlEqualTo(PATH))
+                .inScenario("reset").whenScenarioStateIs("Started")
+                .willReturn(aResponse().withStatus(429)
+                        .withHeader("x-ratelimit-reset-tokens", "900ms"))
+                .willSetStateTo("second"));
+        server.stubFor(post(urlEqualTo(PATH))
+                .inScenario("reset").whenScenarioStateIs("second")
+                .willReturn(aResponse().withStatus(200).withBody(completion("ok"))));
+
+        assertThat(provider().complete(LlmRequest.json("s", "u", LlmPurpose.CLASSIFY_EMAIL)).content())
+                .isEqualTo("ok");
+    }
+
+    @Test
+    @DisplayName("the delay formats providers actually send are all understood")
+    void parsesDelayFormats() {
+        var p = new OpenAiCompatibleLlmProvider(props, JsonMapper.build());
+
+        assertThat(p.parseDelay("2")).isEqualTo(2000);        // Retry-After seconds
+        assertThat(p.parseDelay("2.5")).isEqualTo(2500);
+        assertThat(p.parseDelay("577ms")).isEqualTo(577);
+        assertThat(p.parseDelay("1.5s")).isEqualTo(1500);
+        assertThat(p.parseDelay("1m30s")).isEqualTo(90_000);
+        assertThat(p.parseDelay("6h46m4.8s")).isEqualTo(24_364_800);
+        assertThat(p.parseDelay("")).isZero();
+        assertThat(p.parseDelay(null)).isZero();
+        assertThat(p.parseDelay("whenever")).isZero();
+    }
+
+    @Test
     @DisplayName("the configured model name is what callers see")
     void reportsModel() {
         assertThat(provider().model()).isEqualTo("test-model");

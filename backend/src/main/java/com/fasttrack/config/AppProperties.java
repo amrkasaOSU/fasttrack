@@ -63,7 +63,7 @@ public class AppProperties {
     public static class Llm {
         private String baseUrl = "https://api.groq.com/openai/v1";
         private String apiKey = "";
-        private String model = "llama-3.3-70b-versatile";
+        private String model = "openai/gpt-oss-120b";
         private int timeoutSeconds = 30;
         private int maxRetries = 1;
         /** Time-to-live for cached classification results, in days. */

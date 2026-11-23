@@ -56,7 +56,7 @@ MSG
 fi
 
 BASE_URL="${OPENAI_BASE_URL:-https://api.groq.com/openai/v1}"
-MODEL="${LLM_MODEL:-llama-3.3-70b-versatile}"
+MODEL="${LLM_MODEL:-openai/gpt-oss-120b}"
 
 echo "Checking the key reaches ${BASE_URL} ..."
 probe=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \

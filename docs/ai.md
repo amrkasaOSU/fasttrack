@@ -27,7 +27,7 @@ three environment variables and no code:
 ```bash
 OPENAI_BASE_URL=https://api.groq.com/openai/v1   # or http://localhost:11434/v1
 OPENAI_API_KEY=...                               # "ollama" for a local model
-LLM_MODEL=llama-3.3-70b-versatile
+LLM_MODEL=openai/gpt-oss-120b
 ```
 
 No vendor SDK is on the classpath. Tests point the same client at WireMock.

@@ -16,7 +16,12 @@ import com.fasttrack.config.AppProperties;
 import com.fasttrack.config.JsonMapper;
 import com.fasttrack.llm.LlmInvocationRecorder;
 import com.fasttrack.llm.LlmProvider;
+import com.fasttrack.llm.LlmRequest;
+import com.fasttrack.llm.LlmResponse;
+import com.fasttrack.llm.LlmUnavailableException;
 import com.fasttrack.llm.OpenAiCompatibleLlmProvider;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -71,8 +76,10 @@ class ClassifierEvaluationTest {
     @Test
     @DisplayName("evaluate the classifier against the 200-email labeled set")
     void evaluate() throws IOException {
-        List<EvalEmail> dataset = loadDataset();
-        assertThat(dataset).as("evaluation set").hasSize(200);
+        List<EvalEmail> dataset = sample(loadDataset());
+        if (System.getenv("EVAL_SAMPLE") == null) {
+            assertThat(dataset).as("evaluation set").hasSize(200);
+        }
 
         // ---------------------------------------------------------- prefilter
         int droppedCorrectly = 0;
@@ -105,7 +112,8 @@ class ClassifierEvaluationTest {
                 (double) (droppedCorrectly + (kept - countKeptMistakes(dataset))) / dataset.size();
 
         // --------------------------------------------------------- classifier
-        LlmProvider provider = buildProviderIfConfigured();
+        LlmProvider rawProvider = buildProviderIfConfigured();
+        CountingProvider provider = rawProvider == null ? null : new CountingProvider(rawProvider);
         boolean usingLlm = provider != null && provider.isConfigured();
         EmailClassificationService classifier = usingLlm
                 ? new EmailClassificationService(provider, new PromptLibrary(),
@@ -116,6 +124,9 @@ class ClassifierEvaluationTest {
         ClassificationMetrics classifierOnly = new ClassificationMetrics();
         ClassificationMetrics pipeline = new ClassificationMetrics();
         ClassificationMetrics tricky = new ClassificationMetrics();
+        // Only the emails the model itself answered. Without this, a run with
+        // fallbacks reports a blend and calls it the model's score.
+        ClassificationMetrics modelOnly = new ClassificationMetrics();
         List<String> misclassified = new ArrayList<>();
         int fellBackToRules = 0;
         int flaggedForReview = 0;
@@ -143,6 +154,9 @@ class ClassifierEvaluationTest {
                 flaggedForReview++;
             }
             classifierOnly.record(email.category(), result.category(), result.latencyMs());
+            if (usingLlm && result.method() == com.fasttrack.classify.ClassificationMethod.LLM) {
+                modelOnly.record(email.category(), result.category(), result.latencyMs());
+            }
             if (email.isTricky()) {
                 tricky.record(email.category(), result.category(), result.latencyMs());
             }
@@ -177,7 +191,8 @@ class ClassifierEvaluationTest {
         String report = buildReport(method, usingLlm, provider, dataset.size(), kept, totalDropped,
                 dropRate, prefilterAccuracy, droppedWrongly, prefilterMistakes,
                 classifierOnly, pipeline, tricky, fellBackToRules, misclassified,
-                flaggedForReview, errorsFlagged, errorsUnflagged, confidenceSum / dataset.size());
+                flaggedForReview, errorsFlagged, errorsUnflagged, confidenceSum / dataset.size(),
+                provider, modelOnly);
 
         Path output = EVAL_DIR.resolve("results").resolve("classifier-" + method + ".md");
         Files.createDirectories(output.getParent());
@@ -235,6 +250,39 @@ class ClassifierEvaluationTest {
         return new OpenAiCompatibleLlmProvider(props, mapper);
     }
 
+    /**
+     * Optionally trims the set to {@code EVAL_SAMPLE} emails, keeping each
+     * category's share of the whole.
+     *
+     * <p>This exists because free tiers meter tokens per day: the full set
+     * costs more tokens than a day's allowance, so without a way to measure a
+     * representative slice there would be no measurement at all. A random cut
+     * would skew the rare categories, so the sample is stratified.
+     */
+    private List<EvalEmail> sample(List<EvalEmail> all) {
+        String requested = System.getenv("EVAL_SAMPLE");
+        if (requested == null || requested.isBlank()) {
+            return all;
+        }
+        int target = Integer.parseInt(requested.trim());
+        if (target >= all.size()) {
+            return all;
+        }
+
+        var byCategory = new java.util.LinkedHashMap<EmailCategory, List<EvalEmail>>();
+        all.forEach(email -> byCategory
+                .computeIfAbsent(email.category(), key -> new ArrayList<>()).add(email));
+
+        List<EvalEmail> chosen = new ArrayList<>();
+        for (var entry : byCategory.entrySet()) {
+            int share = Math.max(1, Math.round((float) entry.getValue().size() * target / all.size()));
+            chosen.addAll(entry.getValue().subList(0, Math.min(share, entry.getValue().size())));
+        }
+        System.out.printf("EVAL_SAMPLE=%d -> %d emails, stratified across %d categories%n",
+                target, chosen.size(), byCategory.size());
+        return chosen;
+    }
+
     private List<EvalEmail> loadDataset() throws IOException {
         assertThat(Files.exists(DATASET))
                 .as("eval/emails.jsonl - regenerate with python3 scripts/generate_eval_set.py")
@@ -246,6 +294,66 @@ class ClassifierEvaluationTest {
             }
         }
         return emails;
+    }
+
+    /**
+     * Wraps the real provider to record why calls fail.
+     *
+     * <p>A fallback count on its own is not actionable: "30 of 200 fell back"
+     * could be rate limiting, a model that cannot hold a JSON contract, or a
+     * network blip, and the fix differs for each. The service deliberately
+     * swallows these exceptions - that is its job - so the evaluation
+     * observes them here instead.
+     */
+    private static final class CountingProvider implements LlmProvider {
+
+        private final LlmProvider delegate;
+        final Map<String, Integer> failures = new LinkedHashMap<>();
+        int calls;
+
+        CountingProvider(LlmProvider delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean isConfigured() {
+            return delegate.isConfigured();
+        }
+
+        @Override
+        public String model() {
+            return delegate.model();
+        }
+
+        @Override
+        public LlmResponse complete(LlmRequest request) {
+            calls++;
+            try {
+                return delegate.complete(request);
+            } catch (LlmUnavailableException ex) {
+                failures.merge(summarise(ex.getMessage()), 1, Integer::sum);
+                throw ex;
+            }
+        }
+
+        /** Groups messages so the report shows causes, not 30 unique strings. */
+        private String summarise(String message) {
+            if (message == null) {
+                return "unknown";
+            }
+            var matcher = java.util.regex.Pattern.compile("HTTP (\\d{3})").matcher(message);
+            if (matcher.find()) {
+                String code = matcher.group(1);
+                String meaning = switch (code) {
+                    case "400" -> "400 (provider rejected the request - often strict JSON mode)";
+                    case "401", "403" -> code + " (auth)";
+                    case "429" -> "429 (rate limited)";
+                    default -> code.startsWith("5") ? code + " (provider error)" : code;
+                };
+                return "HTTP " + meaning;
+            }
+            return message.length() > 80 ? message.substring(0, 80) : message;
+        }
     }
 
     private static void sleepQuietly(long millis) {
@@ -273,14 +381,19 @@ class ClassifierEvaluationTest {
                                int flaggedForReview,
                                int errorsFlagged,
                                int errorsUnflagged,
-                               double meanConfidence) {
+                               double meanConfidence,
+                               CountingProvider counted,
+                               ClassificationMetrics modelOnly) {
 
         StringBuilder out = new StringBuilder();
         out.append("# Classifier evaluation - ").append(usingLlm ? "LLM path" : "rule-based path").append("\n\n");
         out.append("Generated ").append(DateTimeFormatter.ISO_INSTANT.format(
                 Instant.now().atOffset(ZoneOffset.UTC).toInstant())).append("\n\n");
         out.append("| Setting | Value |\n|---|---|\n");
-        out.append("| Dataset | `eval/emails.jsonl`, ").append(total).append(" labeled synthetic emails |\n");
+        out.append("| Dataset | `eval/emails.jsonl`, ").append(total)
+           .append(System.getenv("EVAL_SAMPLE") == null
+                   ? " labeled synthetic emails |\n"
+                   : " labeled synthetic emails (stratified sample) |\n");
         out.append("| Method | ").append(usingLlm ? "LLM with rule-based fallback" : "rule-based only (no API key set)").append(" |\n");
         if (usingLlm) {
             out.append("| Model | `").append(provider.model()).append("` |\n");
@@ -321,6 +434,34 @@ class ClassifierEvaluationTest {
                     fellBackToRules, classifierOnly.total()));
         }
         out.append('\n');
+
+        if (usingLlm && fellBackToRules > 0) {
+            out.append("## Why calls fell back to the rule classifier\n\n");
+            out.append(String.format(
+                    "**%d of %d classifications did not come from the model.** The figures above "
+                    + "are therefore a blend: %d from `%s` and %d from the deterministic "
+                    + "classifier. Treat the headline accuracy as the pipeline's, not the "
+                    + "model's.%n%n",
+                    fellBackToRules, total, total - fellBackToRules, counted.model(), fellBackToRules));
+            out.append("| Cause | Calls |\n|---|---:|\n");
+            counted.failures.forEach((cause, count) ->
+                    out.append(String.format("| %s | %d |%n", cause, count)));
+            out.append(String.format("%n%d HTTP calls were made in total (retries included).%n%n",
+                    counted.calls));
+
+            if (modelOnly.total() > 0) {
+                out.append("### The model's own score, on the calls it served\n\n");
+                out.append(String.format(
+                        "Over the %d emails `%s` actually answered - the number to quote for the "
+                        + "model, rather than the blended figure above.%n%n",
+                        modelOnly.total(), counted.model()));
+                out.append("| Measure | Value |\n|---|---:|\n");
+                out.append(String.format("| Accuracy | **%.1f%%** (%d/%d) |%n",
+                        modelOnly.accuracy() * 100,
+                        Math.round(modelOnly.accuracy() * modelOnly.total()), modelOnly.total()));
+                out.append(String.format("| Macro F1 | **%.3f** |%n%n", modelOnly.macroF1()));
+            }
+        }
 
         out.append("## Confidence and the review queue\n\n");
         out.append("A result below ").append(ClassificationResult.REVIEW_THRESHOLD)
